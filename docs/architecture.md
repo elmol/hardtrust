@@ -90,7 +90,7 @@ hardtrust/
 
 **Outputs:** Signed JSON data readings, device identity (serial + public key printed to console on init)
 
-**Referenced stories:** S1.1 (generate identity), S1.4 (emit signed reading), S3.4 (continuous emission)
+**Referenced stories:** S1a.1 (generate identity + register), S1a.2 (emit signed reading + verify), S3.4 (continuous emission)
 
 ### 3.2 attester/ (Rust binary)
 
@@ -107,7 +107,7 @@ hardtrust/
 
 **Outputs:** Transaction receipt (hash, status), verification result (registered/unregistered, signature valid/invalid)
 
-**Referenced stories:** S1.3 (register via CLI), S1.5 (verify attested device), S1.6 (verify unregistered device)
+**Referenced stories:** S1a.1 (register via CLI), S1a.2 (verify registered device), S1a.3 (verify unregistered device)
 
 ### 3.3 common/ (Rust library)
 
@@ -488,12 +488,12 @@ These items are deliberately deferred to feature specs or implementation phase.
 
 | Decision | Deferred to | Notes |
 |----------|-------------|-------|
-| Exact JSON payload schema for signed readings | Feature spec for S1.4 | Must be canonical and deterministic |
+| Exact JSON payload schema for signed readings | Feature spec for S1a.2 | Must be canonical and deterministic |
 | Webapp framework and wallet library | Feature spec for S2.1 | React is decided; specific libraries are not |
 | API design for Slice 2 data ingestion | Feature spec for S2.3/S2.4 | REST vs WebSocket, hosting, auth |
 | Webapp hosting/deployment target | Feature spec for Slice 2 | Static hosting (Vercel, Netlify, etc.) |
 | Data emission interval default | Feature spec for S3.4 | Story map suggests 30 seconds |
-| Contract deploy script parameterization | Implementation of S1.3 | How attester addresses are seeded |
+| Contract deploy script parameterization | Implementation of S1a.1 | How attester addresses are seeded |
 | Revocation mechanism details | Feature spec for R2.3 | Data structure supports it; logic deferred |
 | Device naming scheme | Feature spec for R2.2 | Human-readable names from public key hash |
 | Off-chain data persistence for Slice 2 | Feature spec for Slice 2 | Local JSON sufficient for Slice 1 |
