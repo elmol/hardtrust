@@ -32,7 +32,7 @@ contract HardTrustRegistryTest is Test {
 
     function test_nonAttesterCannotRegister() public {
         vm.prank(randomAddr);
-        vm.expectRevert("not attester");
+        vm.expectRevert(HardTrustRegistry.NotAttester.selector);
         registry.registerDevice(serialHash, deviceAddr);
     }
 

@@ -4,3 +4,9 @@ target/
 # Foundry
 contracts/out/
 contracts/cache/
+
+# Aderyn
+contracts/report.md
+
+# Node
+contracts/node_modules/

@@ -78,6 +78,17 @@ When a spec references other specs or stories (e.g., "depends on S1.1"), read th
 - If an implementation decision contradicts an existing ADR, do not proceed — report it to the human
 - Report any contradictions to the human rather than guessing
 
+## Pre-Commit Validation
+
+Before EVERY `git commit`, run `just ci`. If it fails:
+
+1. Run `cargo fmt` and `forge fmt` to auto-fix formatting
+2. Fix any clippy or solhint warnings in the code
+3. Run `just ci` again to confirm all checks pass
+4. Only then proceed with the commit
+
+Never commit with known lint or test failures. If `just ci` fails 3 times after attempting fixes, stop and report the issue to the human.
+
 ## Build Order
 
 Foundry contracts must be built before Rust crates that depend on ABI output:
