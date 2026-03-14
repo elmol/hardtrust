@@ -32,7 +32,7 @@ test: forge-build
 e2e-register:
     #!/usr/bin/env bash
     set -euo pipefail
-    trap "kill $ANVIL_PID 2>/dev/null" EXIT
+    trap 'kill $ANVIL_PID 2>/dev/null' EXIT
     # Start Anvil in background
     anvil &
     ANVIL_PID=$!
@@ -40,7 +40,7 @@ e2e-register:
     # Build and deploy
     cd contracts && forge build
     CONTRACT_ADDRESS=$(forge script script/Deploy.s.sol \
-      --rpc-url http://127.0.0.1:8545 --broadcast 2>&1 | grep -oP 'DEPLOYED: \K0x[0-9a-fA-F]{40}')
+      --rpc-url http://127.0.0.1:8545 --broadcast 2>&1 | awk '/DEPLOYED:/ {for(i=1;i<=NF;i++) if($i ~ /^0x/) print $i}')
     cd ..
     echo "Contract: $CONTRACT_ADDRESS"
     # Device init

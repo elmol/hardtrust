@@ -170,9 +170,10 @@ A single Solidity contract handles both the attester registry and device registr
 **Owner-only:**
 - Add attester: authorize an Ethereum address as an attester
 - Remove attester: revoke attester authorization
+- *(Note: dynamic attester management (add/remove) is deferred — The Wire (S1a) uses a single immutable attester set at deploy time.)*
 
 **Attester-only (caller must be an authorized attester):**
-- Register device: accepts serial hash and device address, stores the device record with the caller as attester and current timestamp. Reverts if the serial hash is already registered or the caller is not an authorized attester.
+- Register device: accepts serial hash and device address, stores the device record with the caller as attester and current timestamp. Reverts if the serial hash is already registered or the caller is not an authorized attester. *(Note: duplicate serial hash check is deferred to S1b — intentionally omitted from the walking skeleton contract.)*
 
 **Public (anyone can call):**
 - Check device status: given a serial hash or device address, returns registration status and attestation details

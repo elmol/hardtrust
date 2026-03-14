@@ -15,7 +15,7 @@
 ## Code Quality (Solidity)
 - No hardcoded private keys or secrets
 - Access control on state-changing functions
-- Events emitted for all state changes
+- Events emitted for all state changes (deferred in S1a walking skeleton — added in S1b)
 - NatSpec comments on public/external functions
 
 ## Security
