@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Cargo fmt
+        run: cargo fmt --check
+
+      - name: Cargo clippy
+        run: cargo clippy --workspace -- -D warnings
+
+      - name: Forge fmt
+        run: cd contracts && forge fmt --check
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Cargo test
+        run: cargo test --workspace
+
+      - name: Forge test
+        run: cd contracts && forge test
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Integration tests (stub)
+        run: echo "Integration tests — will be enabled when contracts are deployed"
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: E2E tests (stub)
+        run: echo "E2E tests — will be enabled when full flow exists"

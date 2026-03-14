@@ -5,3 +5,9 @@
 - Use conventional commits: feat:, fix:, chore:, docs:, test:
 - Run `just ci` before pushing
 - No direct pushes to main — use PRs
+
+## Branch Protection (configured via GitHub UI)
+
+- Require CI pass before merge
+- Require 1 approval
+- No direct push to `main`
