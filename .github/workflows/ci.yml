@@ -29,6 +29,9 @@ jobs:
       - name: Forge fmt
         run: cd contracts && forge fmt --check
 
+      - name: Solhint
+        run: cd contracts && npx solhint 'src/**/*.sol'
+
   test:
     runs-on: ubuntu-latest
     steps:

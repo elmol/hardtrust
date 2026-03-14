@@ -11,6 +11,8 @@ contract HardTrustRegistry {
         bool active;
     }
 
+    error NotAttester();
+
     address public immutable OWNER;
     address public immutable ATTESTER;
 
@@ -25,7 +27,7 @@ contract HardTrustRegistry {
     /// @param serialHash keccak256 of the device hardware serial number
     /// @param deviceAddr Ethereum address derived from the device's public key
     function registerDevice(bytes32 serialHash, address deviceAddr) external {
-        require(msg.sender == ATTESTER, "not attester");
+        if (msg.sender != ATTESTER) revert NotAttester();
         devices[serialHash] =
             Device({deviceAddr: deviceAddr, attester: msg.sender, attestedAt: block.timestamp, active: true});
     }
