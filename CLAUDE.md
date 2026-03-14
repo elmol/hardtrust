@@ -77,6 +77,26 @@ When a spec references other specs or stories (e.g., "depends on S1.1"), read th
 - If an implementation decision contradicts an existing ADR, do not proceed — report it to the human
 - Report any contradictions to the human rather than guessing
 
+## Build Order
+
+Foundry contracts must be built before Rust crates that depend on ABI output:
+
+1. `cd contracts && forge build` — generates `contracts/out/`
+2. `cargo build --workspace` — Alloy `sol!` macro reads from `contracts/out/`
+
+If you see "file not found" errors from `sol!`, run `forge build` first.
+
+## Local Development (Anvil)
+
+The walking skeleton uses Anvil (Foundry's local chain) with deterministic accounts:
+
+| Account | Role     | Address                                    | Private Key                                                        |
+|---------|----------|--------------------------------------------|--------------------------------------------------------------------|
+| #0      | Deployer | 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 | 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 |
+| #1      | Attester | 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 | 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d |
+
+These are well-known Anvil test keys — NOT secrets. Do not flag them as security issues.
+
 ## Available Skills
 
 Install skills as needed — do not preload skills for code that does not exist yet.
