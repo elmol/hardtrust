@@ -12,7 +12,7 @@ Before implementing any story, read these documents in order:
 
 For non-functional (S0.x) specs that have no story, skip step 1.
 
-When a spec references other specs or stories (e.g., "depends on S1.1"), read those too.
+When a spec references other specs or stories (e.g., "depends on S1a.1"), read those too.
 
 ## Operational Rules
 
@@ -115,7 +115,7 @@ Install skills as needed — do not preload skills for code that does not exist 
 
 | Skill | Install When | Purpose |
 |-------|-------------|---------|
-| `trailofbits/building-secure-contracts` | First Solidity PR (S1.2+) | Smart contract vulnerability scanning |
+| `trailofbits/building-secure-contracts` | First Solidity PR (S1b+) | Smart contract vulnerability scanning |
 | `trailofbits/static-analysis` | When codebase is large enough for SARIF analysis | Multi-tool static analysis |
 
 ## MCP Servers
