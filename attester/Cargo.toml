@@ -1,0 +1,9 @@
+[package]
+name = "attester"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+alloy = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
