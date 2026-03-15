@@ -17,7 +17,7 @@ A Rust binary in `attester/` with a single `register` subcommand that submits a 
   ```toml
   [dependencies]
   clap = { version = "4", features = ["derive"] }
-  alloy = { version = "0.x", features = ["full"] }
+  alloy = { version = "1", features = ["full"] }
   tokio = { version = "1", features = ["full"] }
   ```
   Note: use `alloy` with `full` feature for the walking skeleton. Trim in a later slice.

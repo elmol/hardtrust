@@ -27,9 +27,9 @@ Orchestration handoff: [s1a-handoff](../handoff/s1a-handoff.md)
 | Spec | Name | Status | Handoff |
 |------|------|--------|---------|
 | V1 | [Registry Contract](s1a.1-v1-registry-contract.spec.md) | Implemented | Embedded |
-| V2 | [Device CLI](s1a.1-v2-device-cli.spec.md) | Review | Embedded |
-| V3 | [Attester CLI](s1a.1-v3-attester-cli.spec.md) | Review | Embedded |
-| V4 | [E2E Validation](s1a.1-v4-e2e-register.spec.md) | Review | Embedded |
+| V2 | [Device CLI](s1a.1-v2-device-cli.spec.md) | Implemented | Embedded |
+| V3 | [Attester CLI](s1a.1-v3-attester-cli.spec.md) | Implemented | Embedded |
+| V4 | [E2E Validation](s1a.1-v4-e2e-register.spec.md) | Implemented | Embedded |
 
 V1 and V2 can run in parallel. V3 depends on V1. V4 depends on all.
 
