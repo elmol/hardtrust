@@ -51,7 +51,7 @@ V1 first (types + device emit). V2 depends on V1. V3 depends on V1 + V2.
 
 | Spec | Name | Status | Handoff |
 |------|------|--------|---------|
-| V1 | [E2E The Wire](s1a.3-v1-e2e-the-wire.spec.md) | Draft | Embedded |
+| V1 | [E2E The Wire](s1a.3-v1-e2e-the-wire.spec.md) | Implemented | Embedded |
 
 This is the FINAL gate of "The Wire" walking skeleton. V1 depends on all S1a.1 and S1a.2 specs.
 

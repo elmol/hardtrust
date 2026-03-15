@@ -1088,6 +1088,8 @@ version = "0.1.0"
 dependencies = [
  "alloy",
  "clap",
+ "hardtrust-types",
+ "serde_json",
  "tokio",
 ]
 
@@ -1296,8 +1298,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c673075a2e0e5f4a1dde27ce9dee1ea4558c7ffe648f576438a20ca1d2acc4b0"
 dependencies = [
  "iana-time-zone",
+ "js-sys",
  "num-traits",
  "serde",
+ "wasm-bindgen",
  "windows-link",
 ]
 
@@ -1606,7 +1610,11 @@ dependencies = [
 name = "device"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "clap",
+ "hardtrust-types",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -2000,6 +2008,14 @@ dependencies = [
  "ff",
  "rand_core 0.6.4",
  "subtle",
+]
+
+[[package]]
+name = "hardtrust-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
