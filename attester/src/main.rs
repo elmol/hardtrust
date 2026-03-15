@@ -6,7 +6,7 @@ use alloy::{
     sol,
 };
 use clap::{Parser, Subcommand};
-use hardtrust_types::Reading;
+use hardtrust_types::{dev_config, Reading};
 
 sol!(
     #[sol(rpc)]
@@ -15,7 +15,7 @@ sol!(
 );
 
 #[derive(Parser)]
-#[command(name = "attester")]
+#[command(name = "attester", about = "HardTrust attester CLI — register and verify devices")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -23,21 +23,28 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Register a device on-chain
+    /// Register a device on-chain.
+    ///
+    /// Submits a registerDevice transaction to the HardTrustRegistry contract,
+    /// signed by the authorized attester key. Prints the transaction hash on success.
     Register {
-        /// Device serial string
+        /// The device's unique serial number (e.g. HARDCODED-001)
         #[arg(long)]
         serial: String,
-        /// Device Ethereum address
+        /// Ethereum address derived from the device serial — output of `device init`
         #[arg(long)]
         device_address: Address,
         /// Deployed HardTrustRegistry contract address
         #[arg(long)]
         contract: Address,
     },
-    /// Verify a device reading against on-chain registration
+    /// Verify a device reading against on-chain registration.
+    ///
+    /// Reads a reading.json file produced by `device emit`, queries the registry,
+    /// and prints VERIFIED if the device address matches the on-chain record,
+    /// or UNVERIFIED if the device is not registered.
     Verify {
-        /// Path to reading.json file
+        /// Path to the reading.json file produced by `device emit`
         #[arg(long)]
         file: String,
         /// Deployed HardTrustRegistry contract address
@@ -62,16 +69,14 @@ async fn main() {
         } => {
             let serial_hash = keccak256(serial.as_bytes());
 
-            // Anvil account #1 private key
-            let signer: PrivateKeySigner =
-                "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
-                    .parse()
-                    .expect("valid private key");
+            let signer: PrivateKeySigner = dev_config::DEV_PRIVATE_KEY
+                .parse()
+                .expect("valid private key");
             let wallet = EthereumWallet::from(signer);
 
             let provider = ProviderBuilder::new()
                 .wallet(wallet)
-                .connect_http("http://127.0.0.1:8545".parse().expect("valid URL"));
+                .connect_http(dev_config::DEV_RPC_URL.parse().expect("valid URL"));
 
             let registry = HardTrustRegistry::new(contract, &provider);
             let serial_hash_bytes: FixedBytes<32> = serial_hash.into();
@@ -95,7 +100,7 @@ async fn main() {
             let serial_hash = keccak256(reading.serial.as_bytes());
 
             let provider = ProviderBuilder::new()
-                .connect_http("http://127.0.0.1:8545".parse().expect("valid URL"));
+                .connect_http(dev_config::DEV_RPC_URL.parse().expect("valid URL"));
 
             let registry = HardTrustRegistry::new(contract, &provider);
             let serial_hash_bytes: FixedBytes<32> = serial_hash.into();

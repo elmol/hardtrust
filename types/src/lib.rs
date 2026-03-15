@@ -1,3 +1,5 @@
+pub mod dev_config;
+
 use serde::{Deserialize, Serialize};
 
 /// A signed data reading emitted by a device.
