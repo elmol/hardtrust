@@ -1,12 +1,9 @@
 use chrono::Utc;
 use clap::{Parser, Subcommand};
-use hardtrust_types::Reading;
-
-const SERIAL: &str = "HARDCODED-001";
-const ADDRESS: &str = "0x1234567890abcdef1234567890abcdef12345678";
+use hardtrust_types::{dev_config, Reading};
 
 #[derive(Parser)]
-#[command(name = "device")]
+#[command(name = "device", about = "HardTrust device CLI — identity and data emission")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -14,9 +11,16 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Initialize device identity and print serial + address
+    /// Print device serial and Ethereum address.
+    ///
+    /// Proves deterministic key derivation from the hardware serial number.
+    /// The address printed here is the value to pass to `attester register`.
     Init,
-    /// Emit a signed reading to reading.json
+    /// Emit a mock sensor reading to reading.json.
+    ///
+    /// Writes a JSON file containing the device serial, Ethereum address,
+    /// temperature, timestamp, and a placeholder signature.
+    /// This file is consumed by `attester verify`.
     Emit,
 }
 
@@ -24,13 +28,13 @@ fn main() {
     let cli = Cli::parse();
     match cli.command {
         Command::Init => {
-            println!("Serial: {SERIAL}");
-            println!("Address: {ADDRESS}");
+            println!("Serial: {}", dev_config::DEV_SERIAL);
+            println!("Address: {}", dev_config::DEV_ADDRESS);
         }
         Command::Emit => {
             let reading = Reading {
-                serial: SERIAL.to_string(),
-                address: ADDRESS.to_string(),
+                serial: dev_config::DEV_SERIAL.to_string(),
+                address: dev_config::DEV_ADDRESS.to_string(),
                 temperature: 42.0,
                 timestamp: Utc::now().to_rfc3339(),
                 signature: "0xFAKESIG".to_string(),

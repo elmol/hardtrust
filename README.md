@@ -4,93 +4,99 @@ DePIN device identity and attestation system.
 
 HardTrust enables physical devices (starting with Raspberry Pi) to cryptographically prove their identity and attest sensor readings on-chain. Devices sign data with secp256k1 keys, and an EVM smart contract verifies those signatures — creating a trustless bridge between hardware and blockchain.
 
-## Architecture Overview
+## The Wire — Walking Skeleton
 
-```
-┌──────────────┐       ┌──────────────┐       ┌──────────────────┐
-│   Device     │       │   Attester   │       │   Smart Contract │
-│  (RPi +      │──────▶│   Service    │──────▶│   (EVM)          │
-│   Sensors)   │ signed│              │  tx   │                  │
-│              │ data  │              │       │  - Registry      │
-│  secp256k1   │       │  Alloy/RPC   │       │  - Attestation   │
-└──────────────┘       └──────────────┘       └──────────────────┘
-                                                      │
-                                              ┌───────▼────────┐
-                                              │    Webapp       │
-                                              │  (Dashboard)    │
-                                              └────────────────┘
+"The Wire" is the end-to-end walking skeleton proving the core value proposition:
+
+> A device that is registered on-chain is **VERIFIED**. A device that is not registered is **UNVERIFIED**.
+
+The full flow in one command:
+
+```bash
+just e2e-the-wire
+# Expected output: The Wire gate: PASSED
 ```
 
-**Key design decisions:**
+What it does:
+1. Starts a local Anvil chain
+2. Deploys the `HardTrustRegistry` contract
+3. Runs `device init` to print device identity (serial + address)
+4. Runs `attester register` to register the device on-chain
+5. Runs `device emit` to write a mock `reading.json`
+6. Runs `attester verify` on the reading — expects **VERIFIED**
+7. Runs `attester verify` on a fake reading — expects **UNVERIFIED**
 
-- **secp256k1/ECDSA** for device identity — EVM-native verification via `ecrecover`
-- **Hybrid storage** — device registration on-chain, sensor data off-chain
-- **Single registry contract** — handles both identity and attestation for MVP simplicity
-- **Alloy** for Rust-to-EVM bindings (successor to ethers-rs)
-- **Emulation mode** — full pipeline testing without physical hardware
+## Architecture
 
-See [docs/adr/](docs/adr/) for detailed rationale on each decision.
+```
+contracts/       Solidity smart contract (Foundry) — HardTrustRegistry
+device/          Rust binary — device identity and data emission
+attester/        Rust binary — CLI for registration and verification
+types/           Rust library — shared Reading struct and dev constants
+```
+
+## Prerequisites
+
+- [Rust](https://rustup.rs/) (stable)
+- [Foundry](https://getfoundry.sh/) (`forge`, `cast`, `anvil`)
+- [just](https://github.com/casey/just) (task runner)
+- [Node.js](https://nodejs.org/) (for `solhint`)
+
+## Quick Start
+
+```bash
+# Build everything (contracts first, then Rust crates)
+just build
+
+# Run all tests
+just test
+
+# Run the full walking skeleton gate
+just e2e-the-wire
+```
+
+## Development
+
+```bash
+# Lint (cargo fmt, clippy, forge fmt, solhint, aderyn)
+just lint
+
+# Full CI (lint + test)
+just ci
+```
+
+One story per branch, one PR per story. Run `just ci` before every commit.
+See [CLAUDE.md](CLAUDE.md) for the full development workflow.
 
 ## Repository Structure
 
 ```
 hardtrust/
-├── contracts/          # Solidity smart contracts (Foundry)
+├── contracts/          # Solidity (Foundry project)
+│   ├── src/            # Contract source
+│   ├── test/           # Foundry tests
+│   └── script/         # Deploy scripts
+├── device/             # Rust binary — device CLI
+├── attester/           # Rust binary — attester CLI
+├── types/              # Rust library — shared types and dev constants
+├── scripts/            # Shell scripts (e2e flows)
 ├── docs/
 │   ├── adr/            # Architecture Decision Records
 │   ├── specs/          # Feature specifications
 │   └── stories/        # User stories
-├── Cargo.toml          # Rust workspace (members added as crates are created)
-├── justfile            # Task runner (just ci, just test, just lint)
-├── CLAUDE.md           # AI-assisted development rules
-└── REVIEW.md           # Code review criteria
+├── Cargo.toml          # Rust workspace
+├── justfile            # Task runner
+└── CLAUDE.md           # AI-assisted development rules
 ```
 
-Planned crates (not yet created):
+## Key Design Decisions
 
-- `device/` — Sensor reading, signing, serial communication
-- `attester/` — Attestation service, EVM transaction submission
-- `common/` — Shared types and crypto utilities
-- `webapp/` — Dashboard for viewing device status and attestations
+- **secp256k1/ECDSA** for device identity — EVM-native verification via `ecrecover`
+- **Hybrid storage** — device registration on-chain, sensor data off-chain
+- **Single registry contract** — handles both identity and attestation for MVP simplicity
+- **Alloy** for Rust-to-EVM bindings (successor to ethers-rs)
 
-## Prerequisites
-
-- [Rust](https://rustup.rs/) (stable)
-- [Foundry](https://getfoundry.sh/) (forge, cast)
-- [just](https://github.com/casey/just) (task runner)
-
-## Getting Started
-
-```bash
-# Clone the repo
-git clone https://github.com/elmol/hardtrust.git
-cd hardtrust
-
-# Run CI locally
-just ci
-
-# Build contracts
-cd contracts && forge build
-
-# Run contract tests
-cd contracts && forge test
-```
-
-## Development Workflow
-
-This project uses an AI-assisted writer-reviewer workflow:
-
-1. Read the spec in `docs/specs/` before implementing
-2. One story per branch, one PR per story
-3. Run `just ci` before opening a PR
-4. All PRs require CI pass + human approval before merge
-5. Use conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `test:`
-
-For development without a Raspberry Pi, use emulation mode:
-
-```bash
-HARDTRUST_EMULATE=1 cargo run  # or --emulate flag
-```
+See [docs/adr/](docs/adr/) for detailed rationale.
 
 ## CI
 
@@ -98,10 +104,8 @@ GitHub Actions runs on every push and PR to `main`:
 
 | Job | What it checks |
 |-----|----------------|
-| **lint** | `cargo fmt`, `cargo clippy`, `forge fmt` |
+| **lint** | `cargo fmt`, `cargo clippy`, `forge fmt`, `solhint` |
 | **test** | `cargo test`, `forge test` |
-| **integration** | Stub — enabled when contracts are deployed |
-| **e2e** | Stub — enabled when full flow exists |
 
 ## License
 
