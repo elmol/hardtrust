@@ -39,15 +39,21 @@ V1 and V2 can run in parallel. V3 depends on V1. V4 depends on all.
 
 | Spec | Name | Status | Handoff |
 |------|------|--------|---------|
-| V1 | [Types & Device Emit](s1a.2-v1-types-and-device-emit.spec.md) | Draft | Embedded |
-| V2 | [Attester Verify](s1a.2-v2-attester-verify.spec.md) | Draft | Embedded |
-| V3 | [E2E Verify](s1a.2-v3-e2e-verify.spec.md) | Draft | Embedded |
+| V1 | [Types & Device Emit](s1a.2-v1-types-and-device-emit.spec.md) | Implemented | Embedded |
+| V2 | [Attester Verify](s1a.2-v2-attester-verify.spec.md) | Implemented | Embedded |
+| V3 | [E2E Verify](s1a.2-v3-e2e-verify.spec.md) | Implemented | Embedded |
 
 V1 first (types + device emit). V2 depends on V1. V3 depends on V1 + V2.
 
 #### S1a.3 — Verify unregistered device
 
-**Story:** [S1a.3](../stories/slice-1/s1a.3-verify-unregistered-device.md) | Specs: TBD
+**Story:** [S1a.3](../stories/slice-1/s1a.3-verify-unregistered-device.md)
+
+| Spec | Name | Status | Handoff |
+|------|------|--------|---------|
+| V1 | [E2E The Wire](s1a.3-v1-e2e-the-wire.spec.md) | Draft | Embedded |
+
+This is the FINAL gate of "The Wire" walking skeleton. V1 depends on all S1a.1 and S1a.2 specs.
 
 ### S1b — "Real Crypto" | Pending
 
