@@ -1,6 +1,6 @@
 use alloy::hex;
 use alloy::primitives::{keccak256, Address, FixedBytes, Signature as AlloySignature};
-use hardtrust_core::{verify_reading, Reading};
+use hardtrust_protocol::{verify_reading, Reading};
 
 /// Data required to register a device on-chain.
 pub struct RegistrationData {
@@ -64,7 +64,7 @@ pub fn verify_device(reading: &Reading, on_chain_address: Address) -> Verificati
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hardtrust_core::{public_key_to_address, sign_reading};
+    use hardtrust_protocol::{public_key_to_address, sign_reading};
     use k256::ecdsa::SigningKey;
 
     fn test_signing_key() -> SigningKey {
@@ -98,7 +98,10 @@ mod tests {
     #[test]
     fn verify_device_returns_verified_for_valid_reading() {
         let (reading, address) = signed_reading();
-        assert!(matches!(verify_device(&reading, address), VerificationResult::Verified));
+        assert!(matches!(
+            verify_device(&reading, address),
+            VerificationResult::Verified
+        ));
     }
 
     #[test]

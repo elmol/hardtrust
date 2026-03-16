@@ -1,4 +1,4 @@
-use hardtrust_core::{public_key_to_address, sign_reading, CoreError, Reading};
+use hardtrust_protocol::{public_key_to_address, sign_reading, ProtocolError, Reading};
 use k256::ecdsa::SigningKey;
 
 /// Identity derived from a device's signing key.
@@ -31,7 +31,7 @@ pub fn create_signed_reading(
     serial: String,
     temperature: f64,
     timestamp: String,
-) -> Result<Reading, CoreError> {
+) -> Result<Reading, ProtocolError> {
     let address = public_key_to_address(signing_key.verifying_key());
     let mut reading = Reading {
         serial,
@@ -47,7 +47,7 @@ pub fn create_signed_reading(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hardtrust_core::{verify_reading, public_key_to_address};
+    use hardtrust_protocol::{public_key_to_address, verify_reading};
 
     fn test_signing_key() -> SigningKey {
         let key_bytes =
@@ -87,10 +87,7 @@ mod tests {
             "2026-01-01T00:00:00Z".to_string(),
         )
         .expect("valid reading");
-        assert!(
-            verify_reading(&reading, address),
-            "signature should verify"
-        );
+        assert!(verify_reading(&reading, address), "signature should verify");
     }
 
     #[test]

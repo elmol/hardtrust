@@ -2,8 +2,8 @@ use chrono::Utc;
 use clap::{Parser, Subcommand};
 use k256::ecdsa::SigningKey;
 use rand_core::OsRng;
-use std::os::unix::fs::PermissionsExt;
 use std::error::Error;
+use std::os::unix::fs::PermissionsExt;
 
 #[derive(Parser)]
 #[command(
@@ -65,8 +65,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
     match cli.command {
         Command::Init => {
-            let home = std::env::var("HOME")
-                .map_err(|_| "HOME environment variable not set")?;
+            let home = std::env::var("HOME").map_err(|_| "HOME environment variable not set")?;
             let hardtrust_dir = std::path::PathBuf::from(&home).join(".hardtrust");
             let key_path = hardtrust_dir.join("device.key");
 
@@ -83,8 +82,7 @@ fn run() -> Result<(), Box<dyn Error>> {
                 .map_err(|_| "could not create ~/.hardtrust directory")?;
 
             let key_contents = format!("{}\n", identity.key_hex);
-            std::fs::write(&key_path, &key_contents)
-                .map_err(|_| "could not write device key")?;
+            std::fs::write(&key_path, &key_contents).map_err(|_| "could not write device key")?;
             std::fs::set_permissions(&key_path, std::fs::Permissions::from_mode(0o600))
                 .map_err(|_| "could not set key file permissions")?;
 
@@ -92,8 +90,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             println!("Address: {}", identity.address);
         }
         Command::Emit => {
-            let home = std::env::var("HOME")
-                .map_err(|_| "HOME environment variable not set")?;
+            let home = std::env::var("HOME").map_err(|_| "HOME environment variable not set")?;
             let key_path = std::path::PathBuf::from(&home)
                 .join(".hardtrust")
                 .join("device.key");
@@ -107,8 +104,8 @@ fn run() -> Result<(), Box<dyn Error>> {
                 .map_err(|_| "device.key contains invalid key data")?
                 .trim()
                 .to_string();
-            let key_bytes = hex::decode(&key_hex)
-                .map_err(|_| "device.key contains invalid key data")?;
+            let key_bytes =
+                hex::decode(&key_hex).map_err(|_| "device.key contains invalid key data")?;
             let signing_key = SigningKey::from_slice(&key_bytes)
                 .map_err(|_| "device.key contains invalid key data")?;
 
@@ -118,8 +115,7 @@ fn run() -> Result<(), Box<dyn Error>> {
 
             let json = serde_json::to_string_pretty(&reading)
                 .map_err(|e| format!("failed to serialize reading: {e}"))?;
-            std::fs::write("reading.json", &json)
-                .map_err(|_| "failed to write reading.json")?;
+            std::fs::write("reading.json", &json).map_err(|_| "failed to write reading.json")?;
             println!("Wrote reading.json");
         }
     }
@@ -128,7 +124,7 @@ fn run() -> Result<(), Box<dyn Error>> {
 
 #[cfg(test)]
 mod tests {
-    use hardtrust_core::Reading;
+    use hardtrust_protocol::Reading;
     use std::process::Command;
 
     fn device_bin() -> std::path::PathBuf {
@@ -249,7 +245,10 @@ mod tests {
 
         assert!(!output.status.success());
         let stderr = String::from_utf8(output.stderr).unwrap();
-        assert!(stderr.contains("Error:"), "expected 'Error:' on stderr, got: {stderr}");
+        assert!(
+            stderr.contains("Error:"),
+            "expected 'Error:' on stderr, got: {stderr}"
+        );
         assert!(!stderr.contains("panic"), "should not panic, got: {stderr}");
     }
 

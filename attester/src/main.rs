@@ -1,13 +1,10 @@
 use alloy::{
-    network::EthereumWallet,
-    primitives::Address,
-    providers::ProviderBuilder,
-    signers::local::PrivateKeySigner,
-    sol,
+    network::EthereumWallet, primitives::Address, providers::ProviderBuilder,
+    signers::local::PrivateKeySigner, sol,
 };
 use attester::{prepare_registration, verify_device, VerificationResult};
 use clap::{Parser, Subcommand};
-use hardtrust_core::{dev_config, Reading};
+use hardtrust_protocol::{dev_config, Reading};
 
 sol!(
     #[sol(rpc)]
@@ -80,13 +77,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .map_err(|_| "invalid attester private key")?;
             let wallet = EthereumWallet::from(signer);
 
-            let provider = ProviderBuilder::new()
-                .wallet(wallet)
-                .connect_http(
-                    dev_config::DEV_RPC_URL
-                        .parse()
-                        .map_err(|_| "invalid RPC URL")?,
-                );
+            let provider = ProviderBuilder::new().wallet(wallet).connect_http(
+                dev_config::DEV_RPC_URL
+                    .parse()
+                    .map_err(|_| "invalid RPC URL")?,
+            );
 
             let registry = HardTrustRegistry::new(contract, &provider);
             let tx = registry
@@ -103,17 +98,16 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         Command::Verify { file, contract } => {
             let json = std::fs::read_to_string(&file)
                 .map_err(|e| format!("could not read reading file {file}: {e}"))?;
-            let reading: Reading = serde_json::from_str(&json)
-                .map_err(|e| format!("invalid reading JSON: {e}"))?;
+            let reading: Reading =
+                serde_json::from_str(&json).map_err(|e| format!("invalid reading JSON: {e}"))?;
 
             let reg = prepare_registration(&reading.serial);
 
-            let provider = ProviderBuilder::new()
-                .connect_http(
-                    dev_config::DEV_RPC_URL
-                        .parse()
-                        .map_err(|_| "invalid RPC URL")?,
-                );
+            let provider = ProviderBuilder::new().connect_http(
+                dev_config::DEV_RPC_URL
+                    .parse()
+                    .map_err(|_| "invalid RPC URL")?,
+            );
 
             let registry = HardTrustRegistry::new(contract, &provider);
             let result = registry
@@ -161,7 +155,10 @@ mod tests {
 
         assert!(!output.status.success());
         let stderr = String::from_utf8(output.stderr).unwrap();
-        assert!(stderr.contains("Error:"), "expected 'Error:' on stderr, got: {stderr}");
+        assert!(
+            stderr.contains("Error:"),
+            "expected 'Error:' on stderr, got: {stderr}"
+        );
         assert!(!stderr.contains("panic"), "should not panic, got: {stderr}");
     }
 
@@ -183,7 +180,10 @@ mod tests {
 
         assert!(!output.status.success());
         let stderr = String::from_utf8(output.stderr).unwrap();
-        assert!(stderr.contains("Error:"), "expected 'Error:' on stderr, got: {stderr}");
+        assert!(
+            stderr.contains("Error:"),
+            "expected 'Error:' on stderr, got: {stderr}"
+        );
         assert!(!stderr.contains("panic"), "should not panic, got: {stderr}");
     }
 
