@@ -151,7 +151,7 @@ mod tests {
     fn test_reading() -> Reading {
         Reading {
             serial: "TEST-001".to_string(),
-            address: "f39Fd6e51aad88F6F4ce6aB8827279cffFb92266".to_string(),
+            address: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266".to_string(),
             temperature: 42.0,
             timestamp: "2026-01-01T00:00:00Z".to_string(),
             signature: "0x".to_string(),
