@@ -6,7 +6,7 @@ use alloy::{
     sol,
 };
 use clap::{Parser, Subcommand};
-use hardtrust_types::{dev_config, Reading};
+use hardtrust_types::{dev_config, verify_reading, Reading};
 
 sol!(
     #[sol(rpc)]
@@ -15,7 +15,10 @@ sol!(
 );
 
 #[derive(Parser)]
-#[command(name = "attester", about = "HardTrust attester CLI — register and verify devices")]
+#[command(
+    name = "attester",
+    about = "HardTrust attester CLI — register and verify devices"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -51,11 +54,6 @@ enum Command {
         #[arg(long)]
         contract: Address,
     },
-}
-
-/// Check if a device is verified: on-chain address is non-zero and matches the reading address.
-fn is_verified(on_chain_addr: Address, reading_addr: Address) -> bool {
-    on_chain_addr != Address::ZERO && on_chain_addr == reading_addr
 }
 
 #[tokio::main]
@@ -96,7 +94,6 @@ async fn main() {
             let reading: Reading =
                 serde_json::from_str(&json).expect("failed to parse reading JSON");
 
-            let reading_addr: Address = reading.address.parse().expect("invalid reading address");
             let serial_hash = keccak256(reading.serial.as_bytes());
 
             let provider = ProviderBuilder::new()
@@ -110,7 +107,7 @@ async fn main() {
                 .await
                 .expect("failed to query contract");
 
-            if is_verified(result.deviceAddr, reading_addr) {
+            if verify_reading(&reading, result.deviceAddr) {
                 println!("VERIFIED");
             } else {
                 println!("UNVERIFIED");
@@ -122,33 +119,6 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn is_verified_true_when_addresses_match() {
-        let addr: Address = "0x1234567890abcdef1234567890abcdef12345678"
-            .parse()
-            .unwrap();
-        assert!(is_verified(addr, addr));
-    }
-
-    #[test]
-    fn is_verified_false_when_addresses_differ() {
-        let on_chain: Address = "0x1234567890abcdef1234567890abcdef12345678"
-            .parse()
-            .unwrap();
-        let reading: Address = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
-            .parse()
-            .unwrap();
-        assert!(!is_verified(on_chain, reading));
-    }
-
-    #[test]
-    fn is_verified_false_when_on_chain_is_zero() {
-        let reading: Address = "0x1234567890abcdef1234567890abcdef12345678"
-            .parse()
-            .unwrap();
-        assert!(!is_verified(Address::ZERO, reading));
-    }
 
     #[test]
     fn reading_json_round_trip() {
