@@ -1,6 +1,6 @@
 pub mod dev_config;
 
-use alloy_primitives::{keccak256, Address};
+use alloy_primitives::{keccak256, Address, Signature as AlloySignature, B256};
 use k256::ecdsa::{SigningKey, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Keccak256};
@@ -70,6 +70,63 @@ pub fn sign_reading(key: &SigningKey, reading: &Reading) -> String {
     format!("0x{}", hex::encode(&bytes))
 }
 
+/// Verifies a `Reading`'s ECDSA signature against an expected on-chain address.
+///
+/// Reconstructs the canonical payload hash (identical to `sign_reading`),
+/// recovers the signer address from the signature, and returns `true` only if
+/// recovery succeeds, the recovered address matches `on_chain_address`, and
+/// `on_chain_address` is not the zero address.
+///
+/// Returns `false` — never panics — for any malformed or unrecoverable signature.
+/// See ADR-0007 for why no Ethereum personal sign prefix is used.
+pub fn verify_reading(reading: &Reading, on_chain_address: Address) -> bool {
+    if on_chain_address == Address::ZERO {
+        return false;
+    }
+
+    // Reconstruct canonical hash — must match sign_reading exactly
+    let serial_hash: [u8; 32] = Keccak256::digest(reading.serial.as_bytes()).into();
+
+    let addr_str = reading.address.trim_start_matches("0x");
+    let address_bytes: [u8; 20] = match hex::decode(addr_str).ok().and_then(|b| b.try_into().ok()) {
+        Some(b) => b,
+        None => return false,
+    };
+
+    let temp_scaled = (reading.temperature * 1000.0) as i64;
+
+    let ts = match chrono::DateTime::parse_from_rfc3339(&reading.timestamp) {
+        Ok(dt) => dt.timestamp() as u64,
+        Err(_) => return false,
+    };
+
+    let mut preimage = Vec::with_capacity(68);
+    preimage.extend_from_slice(&serial_hash);
+    preimage.extend_from_slice(&address_bytes);
+    preimage.extend_from_slice(&temp_scaled.to_be_bytes());
+    preimage.extend_from_slice(&ts.to_be_bytes());
+
+    let hash = Keccak256::digest(&preimage);
+    let prehash = B256::from(<[u8; 32]>::from(hash));
+
+    // Parse signature
+    let sig_hex = reading.signature.trim_start_matches("0x");
+    let sig_bytes = match hex::decode(sig_hex) {
+        Ok(b) => b,
+        Err(_) => return false,
+    };
+    let alloy_sig = match AlloySignature::from_raw(&sig_bytes) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+
+    // Recover and compare
+    match alloy_sig.recover_address_from_prehash(&prehash) {
+        Ok(recovered) => recovered == on_chain_address,
+        Err(_) => false,
+    }
+}
+
 /// A signed data reading emitted by a device.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Reading {
@@ -99,6 +156,54 @@ mod tests {
             timestamp: "2026-01-01T00:00:00Z".to_string(),
             signature: "0x".to_string(),
         }
+    }
+
+    fn signed_test_reading() -> (Reading, Address) {
+        let key = test_signing_key();
+        let mut reading = test_reading();
+        reading.signature = sign_reading(&key, &reading);
+        let address = public_key_to_address(key.verifying_key());
+        (reading, address)
+    }
+
+    #[test]
+    fn verify_reading_returns_true_for_valid_signature() {
+        let (reading, address) = signed_test_reading();
+        assert!(verify_reading(&reading, address));
+    }
+
+    #[test]
+    fn verify_reading_returns_false_for_tampered_temperature() {
+        let (mut reading, address) = signed_test_reading();
+        reading.temperature = 99.0;
+        assert!(!verify_reading(&reading, address));
+    }
+
+    #[test]
+    fn verify_reading_returns_false_for_tampered_timestamp() {
+        let (mut reading, address) = signed_test_reading();
+        reading.timestamp = "2025-01-01T00:00:00Z".to_string();
+        assert!(!verify_reading(&reading, address));
+    }
+
+    #[test]
+    fn verify_reading_returns_false_for_tampered_serial() {
+        let (mut reading, address) = signed_test_reading();
+        reading.serial = "TAMPERED".to_string();
+        assert!(!verify_reading(&reading, address));
+    }
+
+    #[test]
+    fn verify_reading_returns_false_for_fake_signature() {
+        let (mut reading, address) = signed_test_reading();
+        reading.signature = "0xFAKESIG".to_string();
+        assert!(!verify_reading(&reading, address));
+    }
+
+    #[test]
+    fn verify_reading_returns_false_for_zero_address() {
+        let (reading, _) = signed_test_reading();
+        assert!(!verify_reading(&reading, Address::ZERO));
     }
 
     #[test]
