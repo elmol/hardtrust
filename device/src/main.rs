@@ -78,7 +78,7 @@ fn main() {
                 .expect("failed to set permissions on device.key");
 
             println!("Serial: {}", serial);
-            println!("Address: {:?}", address);
+            println!("Address: {}", address);
         }
         Command::Emit => {
             let home = std::env::var("HOME").expect("HOME not set");
@@ -101,7 +101,7 @@ fn main() {
 
             let serial = read_serial();
             let address = public_key_to_address(signing_key.verifying_key());
-            let address_str = format!("{:?}", address);
+            let address_str = format!("{}", address);
 
             let mut reading = Reading {
                 serial,

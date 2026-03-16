@@ -17,13 +17,19 @@ DEPLOY_OUTPUT=$(cd contracts && ATTESTER_ADDRESS="${ATTESTER_ADDRESS}" forge scr
 CONTRACT_ADDRESS=$(echo "$DEPLOY_OUTPUT" | awk '/DEPLOYED:/ {for(i=1;i<=NF;i++) if($i ~ /^0x/) print $i}')
 echo "Contract: $CONTRACT_ADDRESS"
 
-# Device init
-cargo run --bin device -- init
+# Device init — remove any existing key so init always prints fresh Serial and Address
+rm -f "${HOME}/.hardtrust/device.key"
+INIT_OUTPUT=$(cargo run --bin device -- init)
+echo "$INIT_OUTPUT"
+REAL_SERIAL=$(echo "$INIT_OUTPUT" | awk '/^Serial:/ {print $2}')
+REAL_ADDRESS=$(echo "$INIT_OUTPUT" | awk '/^Address:/ {print $2}')
+echo "Real serial:  $REAL_SERIAL"
+echo "Real address: $REAL_ADDRESS"
 
-# Register device
+# Register the real device identity on-chain
 cargo run --bin attester -- register \
-  --serial "${DEV_SERIAL}" \
-  --device-address "${DEV_ADDRESS}" \
+  --serial "${REAL_SERIAL}" \
+  --device-address "${REAL_ADDRESS}" \
   --contract "$CONTRACT_ADDRESS"
 
 # Device emit
