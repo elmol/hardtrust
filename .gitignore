@@ -11,3 +11,6 @@ contracts/report.md
 
 # Node
 contracts/node_modules/
+
+# Generated test artifacts
+reading.json

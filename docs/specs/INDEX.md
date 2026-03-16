@@ -13,6 +13,7 @@ Traceability map between user stories, specs, and handoff prompts.
 | S0.5 | [AI Dev Practices](s0.5-ai-dev-practices.spec.md) | — | Implemented | [s0.5-handoff](../handoff/s0.5-handoff.md) |
 | S0.6 | [CLAUDE.md Updates](s0.6-hardtrust-claude-md-updates.spec.md) | — | Implemented | [s0.6-handoff](../handoff/s0.6-handoff.md) |
 | S0.7 | [Solidity Static Analysis](s0.7-solidity-static-analysis.spec.md) | — | Implemented | [s0.7-handoff](../handoff/s0.7-handoff.md) |
+| S0.8 | [CI End-to-End Tests](s0.8-ci-e2e.spec.md) | — | Implemented | Embedded |
 
 ## Slice 1 — CLI/Console
 
@@ -55,7 +56,46 @@ V1 first (types + device emit). V2 depends on V1. V3 depends on V1 + V2.
 
 This is the FINAL gate of "The Wire" walking skeleton. V1 depends on all S1a.1 and S1a.2 specs.
 
-### S1b — "Real Crypto" | Pending
+#### S1a Refactor — Polish The Wire
+
+| Spec | Name | Status | Handoff |
+|------|------|--------|---------|
+| S1a-R | [Refactor The Wire](s1a-refactor.spec.md) | Implemented | Embedded |
+
+### S1b — "Real Crypto"
+
+#### S1b.1 — Real Keys
+
+**Story:** [S1b.1](../stories/slice-1/s1b.1-real-keys.md)
+
+| Spec | Name | Status | Handoff |
+|------|------|--------|---------|
+| V1 | [Key Generation](s1b.1-v1-key-generation.spec.md) | Implemented | Embedded |
+| V2 | [Device Init](s1b.1-v2-device-init.spec.md) | Implemented | Embedded |
+
+V1 first (pure function in types/). V2 depends on V1.
+
+#### S1b.2 — Signed Reading
+
+**Story:** [S1b.2](../stories/slice-1/s1b.2-signed-reading.md)
+
+| Spec | Name | Status | Handoff |
+|------|------|--------|---------|
+| V1 | [sign_reading function](s1b.2-v1-sign-reading.spec.md) | Implemented | Embedded |
+| V2 | [Device Emit](s1b.2-v2-device-emit.spec.md) | Implemented | Embedded |
+
+V1 depends on S1b.1-V1 (k256 in types/). V2 depends on V1 + S1b.1-V2.
+
+#### S1b.3 — Real Verify
+
+**Story:** [S1b.3](../stories/slice-1/s1b.3-real-verify.md)
+
+| Spec | Name | Status | Handoff |
+|------|------|--------|---------|
+| V1 | [verify_reading function](s1b.3-v1-verify-reading.spec.md) | Implemented | Embedded |
+| V2 | [Attester Verify](s1b.3-v2-attester-verify.spec.md) | Implemented | Embedded |
+
+V1 depends on S1b.2-V1 (sign_reading, for round-trip test). V2 depends on V1.
 
 ### S1c — "Polish & CI" | Pending
 

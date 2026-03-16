@@ -87,7 +87,7 @@ The script must:
 pub const DEV_SERIAL: &str = "HARDCODED-001";
 pub const DEV_ADDRESS: &str = "0x1234567890abcdef1234567890abcdef12345678";
 pub const DEV_RPC_URL: &str = "http://127.0.0.1:8545";
-pub const DEV_PRIVATE_KEY: &str = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d";
+pub const DEV_ATTESTER_KEY: &str = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"; // Anvil #1 — attester signing key (NOT the deployer)
 ```
 
 Export from `types/src/lib.rs`:
@@ -96,7 +96,7 @@ Export from `types/src/lib.rs`:
 pub mod dev_config;
 ```
 
-Update `device/src/main.rs` and `attester/src/main.rs` to import and use these constants instead of any locally defined equivalents.
+Update `device/src/main.rs` and `attester/src/main.rs` to import and use these constants instead of any locally defined equivalents. Note: `DEV_ATTESTER_KEY` is used only in `attester/src/main.rs` (the register subcommand signer). Do not use it in the deploy script.
 
 **justfile side — add variables at the top:**
 
