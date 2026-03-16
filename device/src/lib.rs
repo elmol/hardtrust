@@ -1,4 +1,4 @@
-use hardtrust_core::{public_key_to_address, sign_reading, Reading};
+use hardtrust_core::{public_key_to_address, sign_reading, CoreError, Reading};
 use k256::ecdsa::SigningKey;
 
 /// Identity derived from a device's signing key.
@@ -25,12 +25,13 @@ pub fn init_device(signing_key: &SigningKey) -> DeviceIdentity {
 ///
 /// Pure: temperature and timestamp are explicit parameters, not read from
 /// clock or sensors. No file I/O.
+/// Returns `Err` only if signing fails due to invalid address or timestamp.
 pub fn create_signed_reading(
     signing_key: &SigningKey,
     serial: String,
     temperature: f64,
     timestamp: String,
-) -> Reading {
+) -> Result<Reading, CoreError> {
     let address = public_key_to_address(signing_key.verifying_key());
     let mut reading = Reading {
         serial,
@@ -39,8 +40,8 @@ pub fn create_signed_reading(
         timestamp,
         signature: String::new(),
     };
-    reading.signature = sign_reading(signing_key, &reading);
-    reading
+    reading.signature = sign_reading(signing_key, &reading)?;
+    Ok(reading)
 }
 
 #[cfg(test)]
@@ -84,7 +85,8 @@ mod tests {
             "TEST-001".to_string(),
             22.5,
             "2026-01-01T00:00:00Z".to_string(),
-        );
+        )
+        .expect("valid reading");
         assert!(
             verify_reading(&reading, address),
             "signature should verify"
@@ -99,13 +101,15 @@ mod tests {
             "TEST-001".to_string(),
             22.5,
             "2026-01-01T00:00:00Z".to_string(),
-        );
+        )
+        .expect("valid reading");
         let r2 = create_signed_reading(
             &key,
             "TEST-001".to_string(),
             22.5,
             "2026-01-01T00:00:00Z".to_string(),
-        );
+        )
+        .expect("valid reading");
         assert_eq!(r1.signature, r2.signature);
         assert_eq!(r1.temperature, r2.temperature);
         assert_eq!(r1.timestamp, r2.timestamp);

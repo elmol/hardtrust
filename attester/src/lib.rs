@@ -84,7 +84,7 @@ mod tests {
             timestamp: "2026-01-01T00:00:00Z".to_string(),
             signature: String::new(),
         };
-        reading.signature = sign_reading(&key, &reading);
+        reading.signature = sign_reading(&key, &reading).expect("valid reading");
         (reading, address)
     }
 
