@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 use k256::ecdsa::SigningKey;
 use rand_core::OsRng;
 use std::os::unix::fs::PermissionsExt;
+use std::error::Error;
 
 #[derive(Parser)]
 #[command(
@@ -54,34 +55,45 @@ fn read_serial() -> String {
 }
 
 fn main() {
+    if let Err(e) = run() {
+        eprintln!("Error: {e}");
+        std::process::exit(1);
+    }
+}
+
+fn run() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
     match cli.command {
         Command::Init => {
-            let home = std::env::var("HOME").expect("HOME not set");
+            let home = std::env::var("HOME")
+                .map_err(|_| "HOME environment variable not set")?;
             let hardtrust_dir = std::path::PathBuf::from(&home).join(".hardtrust");
             let key_path = hardtrust_dir.join("device.key");
 
             if key_path.exists() {
                 println!("Device identity already exists. Run with --force to regenerate.");
-                return;
+                return Ok(());
             }
 
             let serial = read_serial();
             let signing_key = SigningKey::random(&mut OsRng);
             let identity = init_device(&signing_key);
 
-            std::fs::create_dir_all(&hardtrust_dir).expect("failed to create ~/.hardtrust");
+            std::fs::create_dir_all(&hardtrust_dir)
+                .map_err(|_| "could not create ~/.hardtrust directory")?;
 
             let key_contents = format!("{}\n", identity.key_hex);
-            std::fs::write(&key_path, &key_contents).expect("failed to write device.key");
+            std::fs::write(&key_path, &key_contents)
+                .map_err(|_| "could not write device key")?;
             std::fs::set_permissions(&key_path, std::fs::Permissions::from_mode(0o600))
-                .expect("failed to set permissions on device.key");
+                .map_err(|_| "could not set key file permissions")?;
 
             println!("Serial: {}", serial);
             println!("Address: {}", identity.address);
         }
         Command::Emit => {
-            let home = std::env::var("HOME").expect("HOME not set");
+            let home = std::env::var("HOME")
+                .map_err(|_| "HOME environment variable not set")?;
             let key_path = std::path::PathBuf::from(&home)
                 .join(".hardtrust")
                 .join("device.key");
@@ -92,22 +104,26 @@ fn main() {
             }
 
             let key_hex = std::fs::read_to_string(&key_path)
-                .expect("failed to read device.key")
+                .map_err(|_| "device.key contains invalid key data")?
                 .trim()
                 .to_string();
-            let key_bytes = hex::decode(&key_hex).expect("invalid key hex in device.key");
-            let signing_key =
-                SigningKey::from_slice(&key_bytes).expect("invalid key in device.key");
+            let key_bytes = hex::decode(&key_hex)
+                .map_err(|_| "device.key contains invalid key data")?;
+            let signing_key = SigningKey::from_slice(&key_bytes)
+                .map_err(|_| "device.key contains invalid key data")?;
 
             let serial = read_serial();
             let timestamp = Utc::now().to_rfc3339();
-            let reading = create_signed_reading(&signing_key, serial, 22.5, timestamp);
+            let reading = create_signed_reading(&signing_key, serial, 22.5, timestamp)?;
 
-            let json = serde_json::to_string_pretty(&reading).expect("failed to serialize reading");
-            std::fs::write("reading.json", &json).expect("failed to write reading.json");
+            let json = serde_json::to_string_pretty(&reading)
+                .map_err(|e| format!("failed to serialize reading: {e}"))?;
+            std::fs::write("reading.json", &json)
+                .map_err(|_| "failed to write reading.json")?;
             println!("Wrote reading.json");
         }
     }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -214,6 +230,27 @@ mod tests {
             "signature should be 132-char 0x-prefixed hex, got: {}",
             reading.signature
         );
+    }
+
+    #[test]
+    fn emit_with_corrupted_key_prints_error_not_panic() {
+        let home_dir = tempfile::tempdir().expect("failed to create temp dir");
+        let work_dir = tempfile::tempdir().expect("failed to create work dir");
+        let hardtrust_dir = home_dir.path().join(".hardtrust");
+        std::fs::create_dir_all(&hardtrust_dir).unwrap();
+        std::fs::write(hardtrust_dir.join("device.key"), "NOTVALIDHEX\n").unwrap();
+
+        let output = Command::new(device_bin())
+            .args(["emit"])
+            .env("HOME", home_dir.path())
+            .current_dir(work_dir.path())
+            .output()
+            .expect("failed to run device binary");
+
+        assert!(!output.status.success());
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains("Error:"), "expected 'Error:' on stderr, got: {stderr}");
+        assert!(!stderr.contains("panic"), "should not panic, got: {stderr}");
     }
 
     #[test]

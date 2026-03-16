@@ -13,3 +13,4 @@ hex = "0.4"
 
 [dev-dependencies]
 k256 = { version = "0.13", features = ["ecdsa"] }
+tempfile = "3"

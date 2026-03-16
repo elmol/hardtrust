@@ -59,6 +59,13 @@ enum Command {
 
 #[tokio::main]
 async fn main() {
+    if let Err(e) = run().await {
+        eprintln!("Error: {e}");
+        std::process::exit(1);
+    }
+}
+
+async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     match cli.command {
         Command::Register {
@@ -70,41 +77,50 @@ async fn main() {
 
             let signer: PrivateKeySigner = dev_config::DEV_PRIVATE_KEY
                 .parse()
-                .expect("valid private key");
+                .map_err(|_| "invalid attester private key")?;
             let wallet = EthereumWallet::from(signer);
 
             let provider = ProviderBuilder::new()
                 .wallet(wallet)
-                .connect_http(dev_config::DEV_RPC_URL.parse().expect("valid URL"));
+                .connect_http(
+                    dev_config::DEV_RPC_URL
+                        .parse()
+                        .map_err(|_| "invalid RPC URL")?,
+                );
 
             let registry = HardTrustRegistry::new(contract, &provider);
             let tx = registry
                 .registerDevice(reg.serial_hash, device_address)
                 .send()
                 .await
-                .expect("failed to send transaction")
+                .map_err(|e| format!("registration transaction failed: {e}"))?
                 .watch()
                 .await
-                .expect("failed to confirm transaction");
+                .map_err(|e| format!("registration transaction failed: {e}"))?;
 
             println!("tx: {tx}");
         }
         Command::Verify { file, contract } => {
-            let json = std::fs::read_to_string(&file).expect("failed to read reading file");
-            let reading: Reading =
-                serde_json::from_str(&json).expect("failed to parse reading JSON");
+            let json = std::fs::read_to_string(&file)
+                .map_err(|e| format!("could not read reading file {file}: {e}"))?;
+            let reading: Reading = serde_json::from_str(&json)
+                .map_err(|e| format!("invalid reading JSON: {e}"))?;
 
             let reg = prepare_registration(&reading.serial);
 
             let provider = ProviderBuilder::new()
-                .connect_http(dev_config::DEV_RPC_URL.parse().expect("valid URL"));
+                .connect_http(
+                    dev_config::DEV_RPC_URL
+                        .parse()
+                        .map_err(|_| "invalid RPC URL")?,
+                );
 
             let registry = HardTrustRegistry::new(contract, &provider);
             let result = registry
                 .getDevice(reg.serial_hash)
                 .call()
                 .await
-                .expect("failed to query contract");
+                .map_err(|e| format!("contract query failed: {e}"))?;
 
             match verify_device(&reading, result.deviceAddr) {
                 VerificationResult::Verified => println!("VERIFIED"),
@@ -112,11 +128,64 @@ async fn main() {
             }
         }
     }
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::process::Command as ProcessCommand;
+
+    fn attester_bin() -> std::path::PathBuf {
+        let mut path = std::env::current_exe().unwrap();
+        path.pop();
+        if path.ends_with("deps") {
+            path.pop();
+        }
+        path.push("attester");
+        path
+    }
+
+    #[test]
+    fn verify_with_nonexistent_file_prints_error_not_panic() {
+        let output = ProcessCommand::new(attester_bin())
+            .args([
+                "verify",
+                "--file",
+                "/nonexistent/path/reading.json",
+                "--contract",
+                "0x0000000000000000000000000000000000000000",
+            ])
+            .output()
+            .expect("failed to run attester binary");
+
+        assert!(!output.status.success());
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains("Error:"), "expected 'Error:' on stderr, got: {stderr}");
+        assert!(!stderr.contains("panic"), "should not panic, got: {stderr}");
+    }
+
+    #[test]
+    fn verify_with_bad_json_prints_error_not_panic() {
+        let tmp = tempfile::NamedTempFile::new().expect("create temp file");
+        std::fs::write(tmp.path(), "bad json").unwrap();
+
+        let output = ProcessCommand::new(attester_bin())
+            .args([
+                "verify",
+                "--file",
+                tmp.path().to_str().unwrap(),
+                "--contract",
+                "0x0000000000000000000000000000000000000000",
+            ])
+            .output()
+            .expect("failed to run attester binary");
+
+        assert!(!output.status.success());
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains("Error:"), "expected 'Error:' on stderr, got: {stderr}");
+        assert!(!stderr.contains("panic"), "should not panic, got: {stderr}");
+    }
 
     #[test]
     fn reading_json_round_trip() {

@@ -5,6 +5,29 @@ use k256::ecdsa::{SigningKey, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Keccak256};
 
+/// Errors that can occur during core signing operations.
+#[derive(Debug)]
+pub enum CoreError {
+    /// The reading contains an invalid Ethereum address.
+    InvalidAddress(String),
+    /// The reading contains an invalid or unparseable timestamp.
+    InvalidTimestamp(String),
+    /// The ECDSA signing operation failed.
+    SigningFailed(String),
+}
+
+impl std::fmt::Display for CoreError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CoreError::InvalidAddress(s) => write!(f, "invalid address: {s}"),
+            CoreError::InvalidTimestamp(s) => write!(f, "invalid timestamp: {s}"),
+            CoreError::SigningFailed(s) => write!(f, "signing failed: {s}"),
+        }
+    }
+}
+
+impl std::error::Error for CoreError {}
+
 /// Derives an Ethereum address from a secp256k1 public key.
 ///
 /// Encodes the key as uncompressed bytes, strips the 0x04 prefix,
@@ -48,13 +71,28 @@ pub fn reading_prehash(reading: &Reading) -> Option<[u8; 32]> {
 /// The payload is `keccak256(serial_hash || address_bytes || temperature_scaled || timestamp_u64)`
 /// where the 68-byte preimage is constructed as specified in S1b.2-V1.
 /// Returns `"0x" + hex(r || s || v)` where v ∈ {0, 1}.
-pub fn sign_reading(key: &SigningKey, reading: &Reading) -> String {
-    let hash = reading_prehash(reading).expect("invalid reading");
+/// Returns `Err` if the reading contains an invalid address, timestamp, or signing fails.
+pub fn sign_reading(key: &SigningKey, reading: &Reading) -> Result<String, CoreError> {
+    // Validate address
+    let addr_str = reading.address.trim_start_matches("0x");
+    if hex::decode(addr_str)
+        .ok()
+        .and_then(|b| <[u8; 20]>::try_from(b).ok())
+        .is_none()
+    {
+        return Err(CoreError::InvalidAddress(reading.address.clone()));
+    }
 
-    // Sign
+    // Validate timestamp
+    if chrono::DateTime::parse_from_rfc3339(&reading.timestamp).is_err() {
+        return Err(CoreError::InvalidTimestamp(reading.timestamp.clone()));
+    }
+
+    let hash = reading_prehash(reading).expect("already validated above");
+
     let (sig, recovery_id) = key
         .sign_prehash_recoverable(hash.as_ref())
-        .expect("signing failed");
+        .map_err(|e| CoreError::SigningFailed(e.to_string()))?;
 
     let r = sig.r().to_bytes();
     let s = sig.s().to_bytes();
@@ -65,7 +103,7 @@ pub fn sign_reading(key: &SigningKey, reading: &Reading) -> String {
     bytes.extend_from_slice(&s);
     bytes.push(v);
 
-    format!("0x{}", hex::encode(&bytes))
+    Ok(format!("0x{}", hex::encode(&bytes)))
 }
 
 /// Verifies a `Reading`'s ECDSA signature against an expected on-chain address.
@@ -140,7 +178,7 @@ mod tests {
     fn signed_test_reading() -> (Reading, Address) {
         let key = test_signing_key();
         let mut reading = test_reading();
-        reading.signature = sign_reading(&key, &reading);
+        reading.signature = sign_reading(&key, &reading).expect("valid reading");
         let address = public_key_to_address(key.verifying_key());
         (reading, address)
     }
@@ -192,7 +230,7 @@ mod tests {
 
         let key = test_signing_key();
         let reading = test_reading();
-        let sig_hex = sign_reading(&key, &reading);
+        let sig_hex = sign_reading(&key, &reading).expect("valid reading");
 
         let expected_address = public_key_to_address(key.verifying_key());
 
@@ -228,8 +266,8 @@ mod tests {
     fn sign_reading_is_deterministic() {
         let key = test_signing_key();
         let reading = test_reading();
-        let sig1 = sign_reading(&key, &reading);
-        let sig2 = sign_reading(&key, &reading);
+        let sig1 = sign_reading(&key, &reading).expect("valid reading");
+        let sig2 = sign_reading(&key, &reading).expect("valid reading");
         assert_eq!(sig1, sig2);
     }
 
@@ -320,5 +358,23 @@ mod tests {
         let json = r#"{"serial":"X","address":"Y","temperature":1.0,"timestamp":"Z"}"#;
         let result = serde_json::from_str::<Reading>(json);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn sign_reading_returns_err_for_invalid_address() {
+        let key = test_signing_key();
+        let mut reading = test_reading();
+        reading.address = "0xZZZZ".to_string();
+        let result = sign_reading(&key, &reading);
+        assert!(matches!(result, Err(CoreError::InvalidAddress(_))));
+    }
+
+    #[test]
+    fn sign_reading_returns_err_for_invalid_timestamp() {
+        let key = test_signing_key();
+        let mut reading = test_reading();
+        reading.timestamp = "not-a-timestamp".to_string();
+        let result = sign_reading(&key, &reading);
+        assert!(matches!(result, Err(CoreError::InvalidTimestamp(_))));
     }
 }
