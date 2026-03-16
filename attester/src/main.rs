@@ -1,12 +1,13 @@
 use alloy::{
     network::EthereumWallet,
-    primitives::{keccak256, Address, FixedBytes},
+    primitives::Address,
     providers::ProviderBuilder,
     signers::local::PrivateKeySigner,
     sol,
 };
+use attester::{prepare_registration, verify_device, VerificationResult};
 use clap::{Parser, Subcommand};
-use hardtrust_core::{dev_config, verify_reading, Reading};
+use hardtrust_core::{dev_config, Reading};
 
 sol!(
     #[sol(rpc)]
@@ -65,7 +66,7 @@ async fn main() {
             device_address,
             contract,
         } => {
-            let serial_hash = keccak256(serial.as_bytes());
+            let reg = prepare_registration(&serial);
 
             let signer: PrivateKeySigner = dev_config::DEV_PRIVATE_KEY
                 .parse()
@@ -77,9 +78,8 @@ async fn main() {
                 .connect_http(dev_config::DEV_RPC_URL.parse().expect("valid URL"));
 
             let registry = HardTrustRegistry::new(contract, &provider);
-            let serial_hash_bytes: FixedBytes<32> = serial_hash.into();
             let tx = registry
-                .registerDevice(serial_hash_bytes, device_address)
+                .registerDevice(reg.serial_hash, device_address)
                 .send()
                 .await
                 .expect("failed to send transaction")
@@ -94,23 +94,21 @@ async fn main() {
             let reading: Reading =
                 serde_json::from_str(&json).expect("failed to parse reading JSON");
 
-            let serial_hash = keccak256(reading.serial.as_bytes());
+            let reg = prepare_registration(&reading.serial);
 
             let provider = ProviderBuilder::new()
                 .connect_http(dev_config::DEV_RPC_URL.parse().expect("valid URL"));
 
             let registry = HardTrustRegistry::new(contract, &provider);
-            let serial_hash_bytes: FixedBytes<32> = serial_hash.into();
             let result = registry
-                .getDevice(serial_hash_bytes)
+                .getDevice(reg.serial_hash)
                 .call()
                 .await
                 .expect("failed to query contract");
 
-            if verify_reading(&reading, result.deviceAddr) {
-                println!("VERIFIED");
-            } else {
-                println!("UNVERIFIED");
+            match verify_device(&reading, result.deviceAddr) {
+                VerificationResult::Verified => println!("VERIFIED"),
+                VerificationResult::Unverified(_) => println!("UNVERIFIED"),
             }
         }
     }
