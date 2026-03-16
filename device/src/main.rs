@@ -1,6 +1,6 @@
 use chrono::Utc;
 use clap::{Parser, Subcommand};
-use hardtrust_types::{public_key_to_address, sign_reading, Reading};
+use hardtrust_core::{public_key_to_address, sign_reading, Reading};
 use k256::ecdsa::SigningKey;
 use rand_core::OsRng;
 use std::os::unix::fs::PermissionsExt;
@@ -121,7 +121,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use hardtrust_types::Reading;
+    use hardtrust_core::Reading;
     use std::process::Command;
 
     fn device_bin() -> std::path::PathBuf {

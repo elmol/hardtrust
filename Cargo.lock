@@ -1088,7 +1088,7 @@ version = "0.1.0"
 dependencies = [
  "alloy",
  "clap",
- "hardtrust-types",
+ "hardtrust-core",
  "serde_json",
  "tokio",
 ]
@@ -1612,7 +1612,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "clap",
- "hardtrust-types",
+ "hardtrust-core",
  "hex",
  "k256",
  "rand_core 0.6.4",
@@ -2014,7 +2014,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "hardtrust-types"
+name = "hardtrust-core"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives",

@@ -6,7 +6,7 @@ use alloy::{
     sol,
 };
 use clap::{Parser, Subcommand};
-use hardtrust_types::{dev_config, verify_reading, Reading};
+use hardtrust_core::{dev_config, verify_reading, Reading};
 
 sol!(
     #[sol(rpc)]

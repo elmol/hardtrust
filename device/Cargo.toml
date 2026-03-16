@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
-hardtrust-types = { path = "../types" }
+hardtrust-core = { path = "../core" }
 serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }
 k256 = { version = "0.13", features = ["ecdsa"] }
