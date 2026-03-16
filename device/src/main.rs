@@ -1,6 +1,5 @@
 use chrono::Utc;
 use clap::{Parser, Subcommand};
-use hardtrust_core::{public_key_to_address, sign_reading, Reading};
 use k256::ecdsa::SigningKey;
 use rand_core::OsRng;
 use std::os::unix::fs::PermissionsExt;
@@ -30,6 +29,8 @@ enum Command {
     /// directory. Run `device init` first.
     Emit,
 }
+
+use device::{create_signed_reading, init_device};
 
 /// Read hardware serial from device tree, or fall back to an emulated serial.
 fn read_serial() -> String {
@@ -67,18 +68,17 @@ fn main() {
 
             let serial = read_serial();
             let signing_key = SigningKey::random(&mut OsRng);
-            let address = public_key_to_address(signing_key.verifying_key());
+            let identity = init_device(&signing_key);
 
             std::fs::create_dir_all(&hardtrust_dir).expect("failed to create ~/.hardtrust");
 
-            let hex_key = hex::encode(signing_key.to_bytes());
-            let key_contents = format!("{}\n", hex_key);
+            let key_contents = format!("{}\n", identity.key_hex);
             std::fs::write(&key_path, &key_contents).expect("failed to write device.key");
             std::fs::set_permissions(&key_path, std::fs::Permissions::from_mode(0o600))
                 .expect("failed to set permissions on device.key");
 
             println!("Serial: {}", serial);
-            println!("Address: {}", address);
+            println!("Address: {}", identity.address);
         }
         Command::Emit => {
             let home = std::env::var("HOME").expect("HOME not set");
@@ -100,17 +100,8 @@ fn main() {
                 SigningKey::from_slice(&key_bytes).expect("invalid key in device.key");
 
             let serial = read_serial();
-            let address = public_key_to_address(signing_key.verifying_key());
-            let address_str = format!("{}", address);
-
-            let mut reading = Reading {
-                serial,
-                address: address_str,
-                temperature: 22.5,
-                timestamp: Utc::now().to_rfc3339(),
-                signature: String::new(),
-            };
-            reading.signature = sign_reading(&signing_key, &reading);
+            let timestamp = Utc::now().to_rfc3339();
+            let reading = create_signed_reading(&signing_key, serial, 22.5, timestamp);
 
             let json = serde_json::to_string_pretty(&reading).expect("failed to serialize reading");
             std::fs::write("reading.json", &json).expect("failed to write reading.json");
