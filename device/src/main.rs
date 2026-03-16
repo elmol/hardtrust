@@ -1,6 +1,6 @@
 use chrono::Utc;
 use clap::{Parser, Subcommand};
-use hardtrust_types::{dev_config, public_key_to_address, Reading};
+use hardtrust_types::{public_key_to_address, sign_reading, Reading};
 use k256::ecdsa::SigningKey;
 use rand_core::OsRng;
 use std::os::unix::fs::PermissionsExt;
@@ -23,11 +23,11 @@ enum Command {
     /// an emulated serial based on the hostname. Prints the serial and Ethereum
     /// address derived from the generated key.
     Init,
-    /// Emit a mock sensor reading to reading.json.
+    /// Emit a signed sensor reading to reading.json.
     ///
-    /// Writes a JSON file containing the device serial, Ethereum address,
-    /// temperature, timestamp, and a placeholder signature.
-    /// This file is consumed by `attester verify`.
+    /// Loads the device key from ~/.hardtrust/device.key, derives the serial
+    /// and address, signs the reading, and writes reading.json to the current
+    /// directory. Run `device init` first.
     Emit,
 }
 
@@ -81,13 +81,37 @@ fn main() {
             println!("Address: {:?}", address);
         }
         Command::Emit => {
-            let reading = Reading {
-                serial: dev_config::DEV_SERIAL.to_string(),
-                address: dev_config::DEV_ADDRESS.to_string(),
-                temperature: 42.0,
+            let home = std::env::var("HOME").expect("HOME not set");
+            let key_path = std::path::PathBuf::from(&home)
+                .join(".hardtrust")
+                .join("device.key");
+
+            if !key_path.exists() {
+                eprintln!("Device not initialized. Run 'device init' first.");
+                std::process::exit(1);
+            }
+
+            let key_hex = std::fs::read_to_string(&key_path)
+                .expect("failed to read device.key")
+                .trim()
+                .to_string();
+            let key_bytes = hex::decode(&key_hex).expect("invalid key hex in device.key");
+            let signing_key =
+                SigningKey::from_slice(&key_bytes).expect("invalid key in device.key");
+
+            let serial = read_serial();
+            let address = public_key_to_address(signing_key.verifying_key());
+            let address_str = format!("{:?}", address);
+
+            let mut reading = Reading {
+                serial,
+                address: address_str,
+                temperature: 22.5,
                 timestamp: Utc::now().to_rfc3339(),
-                signature: "0xFAKESIG".to_string(),
+                signature: String::new(),
             };
+            reading.signature = sign_reading(&signing_key, &reading);
+
             let json = serde_json::to_string_pretty(&reading).expect("failed to serialize reading");
             std::fs::write("reading.json", &json).expect("failed to write reading.json");
             println!("Wrote reading.json");
@@ -165,24 +189,63 @@ mod tests {
 
     #[test]
     fn emit_writes_valid_reading_json() {
-        let dir = tempfile::tempdir().expect("failed to create temp dir");
+        let home_dir = tempfile::tempdir().expect("failed to create temp dir");
+        let work_dir = tempfile::tempdir().expect("failed to create work dir");
+
+        // Initialize key first
+        Command::new(device_bin())
+            .args(["init"])
+            .env("HOME", home_dir.path())
+            .output()
+            .expect("failed to run device init");
+
         let output = Command::new(device_bin())
             .args(["emit"])
-            .current_dir(dir.path())
+            .env("HOME", home_dir.path())
+            .current_dir(work_dir.path())
             .output()
             .expect("failed to run device binary");
 
         let stdout = String::from_utf8(output.stdout).unwrap();
-        assert!(stdout.contains("Wrote reading.json"));
+        assert!(stdout.contains("Wrote reading.json"), "stdout: {stdout}");
 
-        let contents =
-            std::fs::read_to_string(dir.path().join("reading.json")).expect("failed to read file");
+        let contents = std::fs::read_to_string(work_dir.path().join("reading.json"))
+            .expect("failed to read file");
         let reading: Reading = serde_json::from_str(&contents).expect("failed to parse JSON");
-        assert_eq!(reading.serial, "HARDCODED-001");
-        assert_eq!(
-            reading.address,
-            "0x1234567890abcdef1234567890abcdef12345678"
+        assert!(!reading.serial.is_empty(), "serial should not be empty");
+        assert!(
+            reading.address.starts_with("0x"),
+            "address should start with 0x"
         );
-        assert!((reading.temperature - 42.0).abs() < f64::EPSILON);
+        assert!((reading.temperature - 22.5).abs() < f64::EPSILON);
+        assert!(
+            reading.signature.starts_with("0x") && reading.signature.len() == 132,
+            "signature should be 132-char 0x-prefixed hex, got: {}",
+            reading.signature
+        );
+    }
+
+    #[test]
+    fn emit_fails_without_key() {
+        let home_dir = tempfile::tempdir().expect("failed to create temp dir");
+        let work_dir = tempfile::tempdir().expect("failed to create work dir");
+
+        let output = Command::new(device_bin())
+            .args(["emit"])
+            .env("HOME", home_dir.path())
+            .current_dir(work_dir.path())
+            .output()
+            .expect("failed to run device binary");
+
+        assert!(!output.status.success(), "should exit non-zero without key");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            stderr.contains("Device not initialized"),
+            "stderr: {stderr}"
+        );
+        assert!(
+            !work_dir.path().join("reading.json").exists(),
+            "reading.json should not be written"
+        );
     }
 }
