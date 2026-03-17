@@ -49,4 +49,68 @@ contract HardTrustRegistryTest is Test {
         assertTrue(registry.isAttester(attesterAddr));
         assertFalse(registry.isAttester(randomAddr));
     }
+
+    function test_registerDevice_emitsEvent() public {
+        vm.prank(attesterAddr);
+        vm.expectEmit(true, true, true, true);
+        emit HardTrustRegistry.DeviceRegistered(serialHash, deviceAddr, attesterAddr);
+        registry.registerDevice(serialHash, deviceAddr);
+    }
+
+    function test_duplicateRegistration_reverts() public {
+        vm.prank(attesterAddr);
+        registry.registerDevice(serialHash, deviceAddr);
+
+        address otherDevice = address(0xBEEF);
+        vm.prank(attesterAddr);
+        vm.expectRevert(abi.encodeWithSelector(HardTrustRegistry.DeviceAlreadyRegistered.selector, serialHash));
+        registry.registerDevice(serialHash, otherDevice);
+    }
+
+    function test_duplicateRegistration_sameAddress_reverts() public {
+        vm.prank(attesterAddr);
+        registry.registerDevice(serialHash, deviceAddr);
+
+        vm.prank(attesterAddr);
+        vm.expectRevert(abi.encodeWithSelector(HardTrustRegistry.DeviceAlreadyRegistered.selector, serialHash));
+        registry.registerDevice(serialHash, deviceAddr);
+    }
+
+    function test_duplicateRegistration_preservesOriginal() public {
+        vm.prank(attesterAddr);
+        registry.registerDevice(serialHash, deviceAddr);
+
+        (address origAddr, address origAtt, uint256 origTs, bool origActive) = registry.getDevice(serialHash);
+
+        address otherDevice = address(0xBEEF);
+        vm.prank(attesterAddr);
+        vm.expectRevert(abi.encodeWithSelector(HardTrustRegistry.DeviceAlreadyRegistered.selector, serialHash));
+        registry.registerDevice(serialHash, otherDevice);
+
+        (address dAddr, address att, uint256 ts, bool active) = registry.getDevice(serialHash);
+        assertEq(dAddr, origAddr);
+        assertEq(att, origAtt);
+        assertEq(ts, origTs);
+        assertEq(active, origActive);
+    }
+
+    function test_differentSerials_bothSucceed() public {
+        bytes32 serial1 = keccak256("SERIAL-A");
+        bytes32 serial2 = keccak256("SERIAL-B");
+        address device1 = address(0xAA);
+        address device2 = address(0xBB);
+
+        vm.prank(attesterAddr);
+        registry.registerDevice(serial1, device1);
+
+        vm.prank(attesterAddr);
+        registry.registerDevice(serial2, device2);
+
+        (address d1,,, bool a1) = registry.getDevice(serial1);
+        (address d2,,, bool a2) = registry.getDevice(serial2);
+        assertEq(d1, device1);
+        assertEq(d2, device2);
+        assertTrue(a1);
+        assertTrue(a2);
+    }
 }
