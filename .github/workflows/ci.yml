@@ -49,6 +49,9 @@ jobs:
       - name: Build contracts
         run: cd contracts && forge build
 
+      - name: Build workspace
+        run: cargo build --workspace
+
       - name: Cargo test
         run: cargo test --workspace
 

@@ -337,8 +337,7 @@ mod tests {
     fn emit_prints_emulated_tag() {
         // This test validates the [EMULATED] tag appears when no real sensor exists.
         // On machines with a real sysfs thermal sensor, skip the assertion.
-        let has_real_sensor =
-            std::path::Path::new(device::SYSFS_THERMAL_PATH).exists();
+        let has_real_sensor = std::path::Path::new(device::SYSFS_THERMAL_PATH).exists();
 
         let home_dir = tempfile::tempdir().expect("failed to create temp dir");
         let work_dir = tempfile::tempdir().expect("failed to create work dir");
@@ -403,8 +402,7 @@ mod tests {
             .to_string();
         let key_bytes = hex::decode(&key_hex).unwrap();
         let signing_key = k256::ecdsa::SigningKey::from_slice(&key_bytes).unwrap();
-        let address =
-            hardtrust_protocol::public_key_to_address(signing_key.verifying_key());
+        let address = hardtrust_protocol::public_key_to_address(signing_key.verifying_key());
         assert!(
             hardtrust_protocol::verify_reading(&reading, address),
             "reading signature should verify after temperature source change"
@@ -415,8 +413,7 @@ mod tests {
     fn consecutive_emits_produce_different_temperatures() {
         // With emulated random range 30.0..=70.0, two calls are overwhelmingly likely to differ.
         // With a real sensor, readings may be identical — only assert when emulated.
-        let has_real_sensor =
-            std::path::Path::new(device::SYSFS_THERMAL_PATH).exists();
+        let has_real_sensor = std::path::Path::new(device::SYSFS_THERMAL_PATH).exists();
 
         let home_dir = tempfile::tempdir().expect("failed to create temp dir");
         let work_dir1 = tempfile::tempdir().expect("failed to create work dir");
