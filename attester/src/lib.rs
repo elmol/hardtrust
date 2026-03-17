@@ -171,14 +171,20 @@ mod tests {
     fn classify_error_detects_already_registered_by_name() {
         let err = "server returned an error response: DeviceAlreadyRegistered(0xabc...)";
         let result = classify_registration_error(err, "0x1234");
-        assert!(matches!(result, RegistrationError::AlreadyRegistered { .. }));
+        assert!(matches!(
+            result,
+            RegistrationError::AlreadyRegistered { .. }
+        ));
     }
 
     #[test]
     fn classify_error_detects_already_registered_by_selector() {
         let err = "execution reverted: custom error a98bbce0:00000...";
         let result = classify_registration_error(err, "0x1234");
-        assert!(matches!(result, RegistrationError::AlreadyRegistered { .. }));
+        assert!(matches!(
+            result,
+            RegistrationError::AlreadyRegistered { .. }
+        ));
     }
 
     #[test]
