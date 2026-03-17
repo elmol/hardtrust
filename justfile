@@ -27,24 +27,14 @@ ci: lint test
 # ---------------------------------------------------------------------------
 # Release recipes
 # ---------------------------------------------------------------------------
-release_version := "v0.1.0"
 
-# Build attester for the host platform (release mode)
-build-release:
-    cargo build --release --package attester
-    @echo "Binary: target/release/attester"
+# Cross-compile device for ARMv7 (mirrors CI — requires zig + cargo-zigbuild)
+build-device-release:
+    RELEASE_VERSION=dev bash scripts/build-device.sh
 
-# Stage release artifacts for current host into ./dist/ (for local testing)
-dist: forge-build
-    mkdir -p dist
-    cargo build --release --package attester --target x86_64-unknown-linux-gnu 2>/dev/null || \
-        cargo build --release --package attester
-    ARTIFACT="attester-{{release_version}}-$(rustc -vV | grep host | awk '{print $2}')" && \
-        cp target/release/attester "dist/$${ARTIFACT}" && \
-        (sha256sum "dist/$${ARTIFACT}" > "dist/$${ARTIFACT}.sha256" 2>/dev/null || \
-         shasum -a 256 "dist/$${ARTIFACT}" > "dist/$${ARTIFACT}.sha256")
-    @echo "Artifacts in ./dist/"
-    @ls -lh dist/
+# Build attester for the current host (mirrors CI)
+build-attester-release:
+    RELEASE_VERSION=dev bash scripts/build-attester.sh
 
 # E2E: The Wire — complete walking skeleton gate
 e2e-the-wire:

@@ -21,9 +21,6 @@ jobs:
 
       - uses: foundry-rs/foundry-toolchain@v1
 
-      - name: Build contracts (ABI required by protocol crate)
-        run: cd contracts && forge build
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: armv7-unknown-linux-musleabihf
@@ -37,17 +34,7 @@ jobs:
         uses: mlugg/setup-zig@v1
 
       - name: Build device (ARMv7 musl)
-        run: |
-          cargo zigbuild \
-            --release \
-            --package device \
-            --target armv7-unknown-linux-musleabihf
-
-      - name: Rename and checksum
-        run: |
-          ARTIFACT="device-${RELEASE_VERSION}-armv7-unknown-linux-musleabihf"
-          cp target/armv7-unknown-linux-musleabihf/release/device "${ARTIFACT}"
-          sha256sum "${ARTIFACT}" > "${ARTIFACT}.sha256"
+        run: bash scripts/build-device.sh
 
       - uses: actions/upload-artifact@v4
         with:
@@ -68,25 +55,12 @@ jobs:
 
       - uses: foundry-rs/foundry-toolchain@v1
 
-      - name: Build contracts
-        run: cd contracts && forge build
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-unknown-linux-gnu
 
       - name: Build attester (x86_64 Linux)
-        run: |
-          cargo build \
-            --release \
-            --package attester \
-            --target x86_64-unknown-linux-gnu
-
-      - name: Rename and checksum
-        run: |
-          ARTIFACT="attester-${RELEASE_VERSION}-x86_64-unknown-linux-gnu"
-          cp target/x86_64-unknown-linux-gnu/release/attester "${ARTIFACT}"
-          sha256sum "${ARTIFACT}" > "${ARTIFACT}.sha256"
+        run: bash scripts/build-attester.sh
 
       - uses: actions/upload-artifact@v4
         with:
@@ -107,25 +81,12 @@ jobs:
 
       - uses: foundry-rs/foundry-toolchain@v1
 
-      - name: Build contracts
-        run: cd contracts && forge build
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin
 
       - name: Build attester (macOS ARM64)
-        run: |
-          cargo build \
-            --release \
-            --package attester \
-            --target aarch64-apple-darwin
-
-      - name: Rename and checksum
-        run: |
-          ARTIFACT="attester-${RELEASE_VERSION}-aarch64-apple-darwin"
-          cp target/aarch64-apple-darwin/release/attester "${ARTIFACT}"
-          shasum -a 256 "${ARTIFACT}" > "${ARTIFACT}.sha256"
+        run: bash scripts/build-attester.sh
 
       - uses: actions/upload-artifact@v4
         with:
@@ -190,8 +151,14 @@ jobs:
 
           ## Install
 
+          **Raspberry Pi (ARMv7):**
           \`\`\`bash
-          curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/${RELEASE_VERSION}/install.sh | bash
+          curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/${RELEASE_VERSION}/install-device.sh | bash
+          \`\`\`
+
+          **Ubuntu / macOS Apple Silicon:**
+          \`\`\`bash
+          curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/${RELEASE_VERSION}/install-attester.sh | bash
           \`\`\`
           EOF
 
