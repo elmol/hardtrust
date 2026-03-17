@@ -33,7 +33,9 @@ jobs:
           echo "${PWD}/${ZIG_DIR}" >> "$GITHUB_PATH"
 
       - name: Install cargo-zigbuild
-        run: cargo install cargo-zigbuild --locked
+        run: |
+          cargo install cargo-zigbuild --locked
+          echo "${CARGO_HOME}/bin" >> "$GITHUB_PATH"
 
       - name: Build device (ARMv7 musl)
         run: bash scripts/build-device.sh
