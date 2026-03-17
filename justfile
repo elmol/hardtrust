@@ -24,6 +24,28 @@ lint:
 
 ci: lint test
 
+# ---------------------------------------------------------------------------
+# Release recipes
+# ---------------------------------------------------------------------------
+release_version := "v0.1.0"
+
+# Build attester for the host platform (release mode)
+build-release:
+    cargo build --release --package attester
+    @echo "Binary: target/release/attester"
+
+# Stage release artifacts for current host into ./dist/ (for local testing)
+dist: forge-build
+    mkdir -p dist
+    cargo build --release --package attester --target x86_64-unknown-linux-gnu 2>/dev/null || \
+        cargo build --release --package attester
+    ARTIFACT="attester-{{release_version}}-$(rustc -vV | grep host | awk '{print $2}')" && \
+        cp target/release/attester "dist/$${ARTIFACT}" && \
+        (sha256sum "dist/$${ARTIFACT}" > "dist/$${ARTIFACT}.sha256" 2>/dev/null || \
+         shasum -a 256 "dist/$${ARTIFACT}" > "dist/$${ARTIFACT}.sha256")
+    @echo "Artifacts in ./dist/"
+    @ls -lh dist/
+
 # E2E: The Wire — complete walking skeleton gate
 e2e-the-wire:
     @ATTESTER_ADDRESS={{anvil_attester_addr}} \
