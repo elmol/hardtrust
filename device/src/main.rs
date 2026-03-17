@@ -70,7 +70,10 @@ fn run() -> Result<(), Box<dyn Error>> {
             let key_path = hardtrust_dir.join("device.key");
 
             if key_path.exists() {
-                println!("Device identity already exists. Run with --force to regenerate.");
+                println!(
+                    "Device already initialized. Delete {} to regenerate.",
+                    key_path.display()
+                );
                 return Ok(());
             }
 
@@ -189,7 +192,7 @@ mod tests {
         assert!(output.status.success());
         let stdout = String::from_utf8(output.stdout).unwrap();
         assert!(
-            stdout.contains("Device identity already exists"),
+            stdout.contains("Device already initialized"),
             "unexpected output: {stdout}"
         );
         // key unchanged

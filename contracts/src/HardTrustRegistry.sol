@@ -16,13 +16,11 @@ contract HardTrustRegistry {
 
     event DeviceRegistered(bytes32 indexed serialHash, address indexed deviceAddr, address indexed attester);
 
-    address public immutable OWNER;
     address public immutable ATTESTER;
 
     mapping(bytes32 => Device) private devices;
 
     constructor(address _attester) {
-        OWNER = msg.sender;
         ATTESTER = _attester;
     }
 
