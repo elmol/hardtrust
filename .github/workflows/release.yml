@@ -25,13 +25,10 @@ jobs:
         with:
           targets: armv7-unknown-linux-musleabihf
 
-      - name: Install cargo-zigbuild
+      - name: Install cargo-zigbuild and Zig
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-zigbuild
-
-      - name: Install Zig
-        uses: mlugg/setup-zig@v1
+          tool: cargo-zigbuild,zig
 
       - name: Build device (ARMv7 musl)
         run: bash scripts/build-device.sh
