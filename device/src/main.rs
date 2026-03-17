@@ -253,6 +253,75 @@ mod tests {
     }
 
     #[test]
+    fn init_with_unwritable_home_prints_error() {
+        let dir = tempfile::tempdir().expect("failed to create temp dir");
+        // Create .hardtrust as a FILE so create_dir_all fails
+        std::fs::write(dir.path().join(".hardtrust"), "not a directory").unwrap();
+
+        let output = Command::new(device_bin())
+            .args(["init"])
+            .env("HOME", dir.path())
+            .output()
+            .expect("failed to run device binary");
+
+        assert!(!output.status.success());
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            stderr.contains("Error:"),
+            "expected 'Error:' on stderr, got: {stderr}"
+        );
+        assert!(!stderr.contains("panic"), "should not panic, got: {stderr}");
+    }
+
+    #[test]
+    fn emit_with_zero_byte_key_prints_error() {
+        let home_dir = tempfile::tempdir().expect("failed to create temp dir");
+        let work_dir = tempfile::tempdir().expect("failed to create work dir");
+        let hardtrust_dir = home_dir.path().join(".hardtrust");
+        std::fs::create_dir_all(&hardtrust_dir).unwrap();
+        std::fs::write(hardtrust_dir.join("device.key"), "").unwrap();
+
+        let output = Command::new(device_bin())
+            .args(["emit"])
+            .env("HOME", home_dir.path())
+            .current_dir(work_dir.path())
+            .output()
+            .expect("failed to run device binary");
+
+        assert!(!output.status.success());
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            stderr.contains("Error:"),
+            "expected 'Error:' on stderr, got: {stderr}"
+        );
+        assert!(!stderr.contains("panic"), "should not panic, got: {stderr}");
+    }
+
+    #[test]
+    fn emit_with_truncated_key_prints_error() {
+        let home_dir = tempfile::tempdir().expect("failed to create temp dir");
+        let work_dir = tempfile::tempdir().expect("failed to create work dir");
+        let hardtrust_dir = home_dir.path().join(".hardtrust");
+        std::fs::create_dir_all(&hardtrust_dir).unwrap();
+        std::fs::write(hardtrust_dir.join("device.key"), "abcd1234\n").unwrap();
+
+        let output = Command::new(device_bin())
+            .args(["emit"])
+            .env("HOME", home_dir.path())
+            .current_dir(work_dir.path())
+            .output()
+            .expect("failed to run device binary");
+
+        assert!(!output.status.success());
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            stderr.contains("Error:"),
+            "expected 'Error:' on stderr, got: {stderr}"
+        );
+        assert!(!stderr.contains("panic"), "should not panic, got: {stderr}");
+    }
+
+    #[test]
     fn emit_fails_without_key() {
         let home_dir = tempfile::tempdir().expect("failed to create temp dir");
         let work_dir = tempfile::tempdir().expect("failed to create work dir");
