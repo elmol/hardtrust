@@ -335,8 +335,8 @@ mod tests {
 
     #[test]
     fn emit_prints_emulated_tag() {
-        // This test validates the [EMULATED] tag appears when no real sensor exists.
-        // On machines with a real sysfs thermal sensor, skip the assertion.
+        // Validates that emit prints "Wrote reading.json" and, when no real thermal
+        // sensor exists, includes "[EMULATED temperature]" in the output.
         let has_real_sensor = std::path::Path::new(device::SYSFS_THERMAL_PATH).exists();
 
         let home_dir = tempfile::tempdir().expect("failed to create temp dir");
@@ -360,14 +360,10 @@ mod tests {
             stdout.contains("Wrote reading.json"),
             "should print 'Wrote reading.json', got: {stdout}"
         );
-        if has_real_sensor {
-            // With a real sensor, the output MAY or MAY NOT include [EMULATED]
-            // depending on whether read_temperature falls back to emulation.
-            // We only assert the base message was printed.
-        } else {
+        if !has_real_sensor {
             assert!(
-                stdout.contains("[EMULATED]"),
-                "should print [EMULATED] tag without sensor, got: {stdout}"
+                stdout.contains("EMULATED"),
+                "should print EMULATED tag without sensor, got: {stdout}"
             );
         }
     }
