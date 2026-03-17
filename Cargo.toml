@@ -2,6 +2,10 @@
 members = ["device", "attester", "protocol"]
 resolver = "2"
 
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
 [profile.release]
 strip = true        # remove debug symbols — smaller binaries
 lto = "thin"        # thin LTO: good compile time / size tradeoff

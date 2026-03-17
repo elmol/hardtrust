@@ -1,0 +1,18 @@
+# cargo-release configuration for HardTrust
+# Usage: cargo release minor (or patch, major, or specific version)
+
+# Do not publish to crates.io
+publish = false
+
+# Tag format — must match release.yml trigger: "v*.*.*"
+tag-name = "v{{version}}"
+tag-message = "HardTrust {{version}}"
+
+# Commit message for the version bump commit
+pre-release-commit-message = "chore: release {{version}}"
+
+# Run tests before releasing
+pre-release-hook = ["cargo", "test", "--workspace"]
+
+# Push commit + tag automatically
+push = true
