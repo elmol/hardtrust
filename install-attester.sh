@@ -33,10 +33,19 @@ detect_target() {
 
 resolve_version() {
   [ -n "${HARDTRUST_VERSION:-}" ] && { echo "${HARDTRUST_VERSION}"; return; }
+
   local v
-  v=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
-    | grep '"tag_name"' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
-  [ -n "${v}" ] || { echo "ERROR: Could not resolve latest release." >&2; exit 1; }
+  # Use /releases (not /releases/latest) so pre-releases are included
+  v=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases" \
+    | grep '"tag_name"' \
+    | head -1 \
+    | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+
+  [ -n "${v}" ] || {
+    echo "ERROR: Could not resolve latest release." >&2
+    echo "       Set HARDTRUST_VERSION=v0.1.0-rc8 or check https://github.com/${REPO}/releases" >&2
+    exit 1
+  }
   echo "${v}"
 }
 
