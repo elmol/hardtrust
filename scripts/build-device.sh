@@ -20,8 +20,11 @@ if ! command -v zig >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! cargo zigbuild --version >/dev/null 2>&1; then
-  echo "ERROR: 'cargo-zigbuild' not found. Install: cargo install cargo-zigbuild" >&2
+if ! command -v cargo-zigbuild >/dev/null 2>&1; then
+  echo "ERROR: 'cargo-zigbuild' not found in PATH." >&2
+  echo "       PATH=${PATH}" >&2
+  echo "       CARGO_HOME=${CARGO_HOME:-unset}" >&2
+  echo "       Install: cargo install cargo-zigbuild" >&2
   exit 1
 fi
 
