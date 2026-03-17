@@ -1,5 +1,38 @@
 use hardtrust_protocol::{public_key_to_address, sign_reading, ProtocolError, Reading};
 use k256::ecdsa::SigningKey;
+use rand::Rng;
+use std::fs;
+
+/// Default sysfs thermal sensor path.
+pub const SYSFS_THERMAL_PATH: &str = "/sys/class/thermal/thermal_zone0/temp";
+
+/// Result of reading a temperature sensor.
+pub struct TemperatureReading {
+    /// Temperature in degrees Celsius.
+    pub celsius: f64,
+    /// Whether the value was emulated (sensor unavailable).
+    pub is_emulated: bool,
+}
+
+/// Read CPU temperature from sysfs, or return a simulated value if unavailable.
+///
+/// Takes the sensor file path as a parameter for testability.
+pub fn read_temperature(sensor_path: &str) -> TemperatureReading {
+    if let Ok(contents) = fs::read_to_string(sensor_path) {
+        if let Ok(millidegrees) = contents.trim().parse::<i64>() {
+            return TemperatureReading {
+                celsius: millidegrees as f64 / 1000.0,
+                is_emulated: false,
+            };
+        }
+    }
+    let mut rng = rand::thread_rng();
+    let value: f64 = rng.gen_range(30.0..=70.0);
+    TemperatureReading {
+        celsius: value,
+        is_emulated: true,
+    }
+}
 
 /// Identity derived from a device's signing key.
 pub struct DeviceIdentity {
@@ -48,6 +81,7 @@ pub fn create_signed_reading(
 mod tests {
     use super::*;
     use hardtrust_protocol::{public_key_to_address, verify_reading};
+    use std::io::Write;
 
     fn test_signing_key() -> SigningKey {
         let key_bytes =
@@ -88,6 +122,59 @@ mod tests {
         )
         .expect("valid reading");
         assert!(verify_reading(&reading, address), "signature should verify");
+    }
+
+    #[test]
+    fn read_temperature_valid_sysfs() {
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        write!(tmp, "42500\n").unwrap();
+        let r = read_temperature(tmp.path().to_str().unwrap());
+        assert!((r.celsius - 42.5).abs() < f64::EPSILON);
+        assert!(!r.is_emulated);
+    }
+
+    #[test]
+    fn read_temperature_trailing_whitespace() {
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        write!(tmp, "55000\n  ").unwrap();
+        let r = read_temperature(tmp.path().to_str().unwrap());
+        assert!((r.celsius - 55.0).abs() < f64::EPSILON);
+        assert!(!r.is_emulated);
+    }
+
+    #[test]
+    fn read_temperature_fallback_missing_file() {
+        let r = read_temperature("/tmp/nonexistent-hardtrust-sensor-test");
+        assert!(r.is_emulated);
+        assert!(r.celsius >= 30.0 && r.celsius <= 70.0);
+    }
+
+    #[test]
+    fn read_temperature_fallback_non_numeric() {
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        write!(tmp, "not-a-number\n").unwrap();
+        let r = read_temperature(tmp.path().to_str().unwrap());
+        assert!(r.is_emulated);
+        assert!(r.celsius >= 30.0 && r.celsius <= 70.0);
+    }
+
+    #[test]
+    fn read_temperature_fallback_empty_file() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let r = read_temperature(tmp.path().to_str().unwrap());
+        assert!(r.is_emulated);
+        assert!(r.celsius >= 30.0 && r.celsius <= 70.0);
+    }
+
+    #[test]
+    fn read_temperature_emulated_values_vary() {
+        let values: Vec<f64> = (0..10)
+            .map(|_| read_temperature("/tmp/nonexistent-hardtrust-sensor-test").celsius)
+            .collect();
+        let distinct = values
+            .windows(2)
+            .any(|w| (w[0] - w[1]).abs() > f64::EPSILON);
+        assert!(distinct, "emulated values should vary, got: {:?}", values);
     }
 
     #[test]
