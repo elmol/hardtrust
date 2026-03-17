@@ -61,6 +61,28 @@ pub fn verify_device(reading: &Reading, on_chain_address: Address) -> Verificati
     }
 }
 
+/// Classification of a registration transaction error.
+pub enum RegistrationError {
+    /// The device is already registered on-chain.
+    AlreadyRegistered { serial_hash: String },
+    /// Any other transaction failure.
+    TransactionFailed(String),
+}
+
+/// Classify a registration error from its string representation.
+///
+/// Detects `DeviceAlreadyRegistered` custom error (selector `0xa98bbce0`)
+/// from the Alloy error string. Pure: no I/O.
+pub fn classify_registration_error(error: &str, serial_hash: &str) -> RegistrationError {
+    if error.contains("DeviceAlreadyRegistered") || error.contains("a98bbce0") {
+        RegistrationError::AlreadyRegistered {
+            serial_hash: serial_hash.to_string(),
+        }
+    } else {
+        RegistrationError::TransactionFailed(error.to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
