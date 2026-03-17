@@ -88,12 +88,20 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .registerDevice(reg.serial_hash, device_address)
                 .send()
                 .await
-                .map_err(|e| format!("registration transaction failed: {e}"))?
+                .map_err(|e| {
+                    let err_str = format!("{e}");
+                    // DeviceAlreadyRegistered(bytes32) selector = 0xa98bbce0
+                    if err_str.contains("DeviceAlreadyRegistered") || err_str.contains("a98bbce0") {
+                        format!("device already registered (serial hash: {})", reg.serial_hash)
+                    } else {
+                        format!("registration transaction failed: {e}")
+                    }
+                })?
                 .watch()
                 .await
                 .map_err(|e| format!("registration transaction failed: {e}"))?;
 
-            println!("tx: {tx}");
+            println!("Registered device. tx: {tx}");
         }
         Command::Verify { file, contract } => {
             let json = std::fs::read_to_string(&file)
