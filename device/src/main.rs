@@ -31,7 +31,7 @@ enum Command {
     Emit,
 }
 
-use device::{create_signed_reading, init_device};
+use device::{create_signed_reading, init_device, read_temperature, SYSFS_THERMAL_PATH};
 
 /// Read hardware serial from device tree, or fall back to an emulated serial.
 fn read_serial() -> String {
@@ -111,12 +111,18 @@ fn run() -> Result<(), Box<dyn Error>> {
 
             let serial = read_serial();
             let timestamp = Utc::now().to_rfc3339();
-            let reading = create_signed_reading(&signing_key, serial, 22.5, timestamp)?;
+            let temp_reading = read_temperature(SYSFS_THERMAL_PATH);
+            let reading =
+                create_signed_reading(&signing_key, serial, temp_reading.celsius, timestamp)?;
 
             let json = serde_json::to_string_pretty(&reading)
                 .map_err(|e| format!("failed to serialize reading: {e}"))?;
             std::fs::write("reading.json", &json).map_err(|_| "failed to write reading.json")?;
-            println!("Wrote reading.json");
+            if temp_reading.is_emulated {
+                println!("Wrote reading.json [EMULATED temperature]");
+            } else {
+                println!("Wrote reading.json");
+            }
         }
     }
     Ok(())
@@ -220,9 +226,11 @@ mod tests {
             reading.address.starts_with("0x"),
             "address should start with 0x"
         );
+        // Temperature must NOT be the old hardcoded 22.5
+        // If real sensor: any valid reading; if emulated: 30.0..=70.0
         assert!(
-            reading.temperature >= 30.0 && reading.temperature <= 70.0,
-            "temperature should be in emulated range 30..=70, got: {}",
+            (reading.temperature - 22.5).abs() > f64::EPSILON,
+            "temperature should not be the old hardcoded 22.5, got: {}",
             reading.temperature
         );
         assert!(
@@ -327,6 +335,11 @@ mod tests {
 
     #[test]
     fn emit_prints_emulated_tag() {
+        // This test validates the [EMULATED] tag appears when no real sensor exists.
+        // On machines with a real sysfs thermal sensor, skip the assertion.
+        let has_real_sensor =
+            std::path::Path::new(device::SYSFS_THERMAL_PATH).exists();
+
         let home_dir = tempfile::tempdir().expect("failed to create temp dir");
         let work_dir = tempfile::tempdir().expect("failed to create work dir");
 
@@ -344,10 +357,21 @@ mod tests {
             .expect("failed to run device emit");
 
         let stdout = String::from_utf8(output.stdout).unwrap();
-        assert!(
-            stdout.contains("[EMULATED]"),
-            "should print [EMULATED] tag on dev/CI machines, got: {stdout}"
-        );
+        if has_real_sensor {
+            assert!(
+                stdout.contains("Wrote reading.json"),
+                "should print 'Wrote reading.json', got: {stdout}"
+            );
+            assert!(
+                !stdout.contains("[EMULATED]"),
+                "should NOT print [EMULATED] with real sensor, got: {stdout}"
+            );
+        } else {
+            assert!(
+                stdout.contains("[EMULATED]"),
+                "should print [EMULATED] tag without sensor, got: {stdout}"
+            );
+        }
     }
 
     #[test]
@@ -389,6 +413,11 @@ mod tests {
 
     #[test]
     fn consecutive_emits_produce_different_temperatures() {
+        // With emulated random range 30.0..=70.0, two calls are overwhelmingly likely to differ.
+        // With a real sensor, readings may be identical — only assert when emulated.
+        let has_real_sensor =
+            std::path::Path::new(device::SYSFS_THERMAL_PATH).exists();
+
         let home_dir = tempfile::tempdir().expect("failed to create temp dir");
         let work_dir1 = tempfile::tempdir().expect("failed to create work dir");
         let work_dir2 = tempfile::tempdir().expect("failed to create work dir");
@@ -422,13 +451,20 @@ mod tests {
         )
         .unwrap();
 
-        // With random range 30.0..=70.0, two calls are overwhelmingly likely to differ
-        assert!(
-            (r1.temperature - r2.temperature).abs() > f64::EPSILON,
-            "consecutive emits should produce different temperatures: {} vs {}",
-            r1.temperature,
-            r2.temperature
-        );
+        if has_real_sensor {
+            // Both should be real sensor readings (not 22.5)
+            assert!(
+                (r1.temperature - 22.5).abs() > f64::EPSILON,
+                "temperature should not be hardcoded 22.5"
+            );
+        } else {
+            assert!(
+                (r1.temperature - r2.temperature).abs() > f64::EPSILON,
+                "consecutive emulated emits should produce different temperatures: {} vs {}",
+                r1.temperature,
+                r2.temperature
+            );
+        }
     }
 
     #[test]
