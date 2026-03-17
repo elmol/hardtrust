@@ -18,7 +18,8 @@ sol!(
 #[derive(Parser)]
 #[command(
     name = "attester",
-    about = "HardTrust attester CLI — register and verify devices"
+    about = "HardTrust attester CLI — register and verify devices",
+    version,
 )]
 struct Cli {
     #[command(subcommand)]
