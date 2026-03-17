@@ -58,9 +58,10 @@ enum Command {
 }
 
 fn env_rpc_url() -> Result<url::Url, Box<dyn std::error::Error>> {
-    let raw = std::env::var("HARDTRUST_RPC_URL")
-        .unwrap_or_else(|_| "http://127.0.0.1:8545".to_string());
-    raw.parse().map_err(|_| format!("invalid RPC URL: {raw}").into())
+    let raw =
+        std::env::var("HARDTRUST_RPC_URL").unwrap_or_else(|_| "http://127.0.0.1:8545".to_string());
+    raw.parse()
+        .map_err(|_| format!("invalid RPC URL: {raw}").into())
 }
 
 #[tokio::main]
@@ -83,9 +84,9 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
             let private_key_hex = std::env::var("HARDTRUST_PRIVATE_KEY")
                 .map_err(|_| "HARDTRUST_PRIVATE_KEY env var is required. Set it to the attester's hex-encoded private key.")?;
-            let signer: PrivateKeySigner = private_key_hex
-                .parse()
-                .map_err(|_| "invalid HARDTRUST_PRIVATE_KEY — must be a hex-encoded private key (e.g. 0x...)")?;
+            let signer: PrivateKeySigner = private_key_hex.parse().map_err(|_| {
+                "invalid HARDTRUST_PRIVATE_KEY — must be a hex-encoded private key (e.g. 0x...)"
+            })?;
             let wallet = EthereumWallet::from(signer);
 
             let provider = ProviderBuilder::new()
