@@ -212,6 +212,77 @@ mod tests {
     }
 
     #[test]
+    #[ignore] // Requires Anvil + deployed contract
+    fn register_duplicate_shows_human_error() {
+        let contract = std::env::var("HARDTRUST_CONTRACT")
+            .expect("HARDTRUST_CONTRACT env var must be set");
+        let serial = format!("DUP-TEST-{}", std::process::id());
+        let device_addr = "0x0000000000000000000000000000000000000042";
+
+        // First registration — should succeed
+        let output1 = ProcessCommand::new(attester_bin())
+            .args([
+                "register",
+                "--serial", &serial,
+                "--device-address", device_addr,
+                "--contract", &contract,
+            ])
+            .output()
+            .expect("failed to run attester register");
+        assert!(output1.status.success(), "first register should succeed: {}",
+            String::from_utf8_lossy(&output1.stderr));
+
+        // Second registration — same serial, should fail with human-readable error
+        let output2 = ProcessCommand::new(attester_bin())
+            .args([
+                "register",
+                "--serial", &serial,
+                "--device-address", device_addr,
+                "--contract", &contract,
+            ])
+            .output()
+            .expect("failed to run attester register");
+
+        assert!(!output2.status.success());
+        let stderr = String::from_utf8(output2.stderr).unwrap();
+        assert!(
+            stderr.contains("device already registered"),
+            "expected human-readable duplicate error, got: {stderr}"
+        );
+    }
+
+    #[test]
+    #[ignore] // Requires Anvil + deployed contract
+    fn register_success_shows_confirmation() {
+        let contract = std::env::var("HARDTRUST_CONTRACT")
+            .expect("HARDTRUST_CONTRACT env var must be set");
+        let serial = format!("SUCCESS-TEST-{}", std::process::id());
+        let device_addr = "0x0000000000000000000000000000000000000099";
+
+        let output = ProcessCommand::new(attester_bin())
+            .args([
+                "register",
+                "--serial", &serial,
+                "--device-address", device_addr,
+                "--contract", &contract,
+            ])
+            .output()
+            .expect("failed to run attester register");
+
+        assert!(output.status.success(), "register should succeed: {}",
+            String::from_utf8_lossy(&output.stderr));
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        assert!(
+            stdout.contains("Registered device"),
+            "expected 'Registered device' in output, got: {stdout}"
+        );
+        assert!(
+            stdout.contains("tx:"),
+            "expected 'tx:' in output, got: {stdout}"
+        );
+    }
+
+    #[test]
     fn register_with_invalid_address_prints_error() {
         let output = ProcessCommand::new(attester_bin())
             .args([
