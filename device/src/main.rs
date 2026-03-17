@@ -9,7 +9,7 @@ use std::os::unix::fs::PermissionsExt;
 #[command(
     name = "device",
     about = "HardTrust device CLI — identity and data emission",
-    version,
+    version
 )]
 struct Cli {
     #[command(subcommand)]

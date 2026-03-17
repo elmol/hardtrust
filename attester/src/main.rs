@@ -19,7 +19,7 @@ sol!(
 #[command(
     name = "attester",
     about = "HardTrust attester CLI — register and verify devices",
-    version,
+    version
 )]
 struct Cli {
     #[command(subcommand)]
