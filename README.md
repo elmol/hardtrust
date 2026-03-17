@@ -91,12 +91,16 @@ hardtrust/
 ├── device/             # Rust binary — device CLI
 ├── attester/           # Rust binary — attester CLI
 ├── protocol/           # Rust library — shared protocol (Reading, crypto, errors)
-├── scripts/            # Shell scripts (e2e flows)
+├── scripts/            # Shell scripts (build, e2e, version check)
 ├── docs/
 │   ├── adr/            # Architecture Decision Records
+│   ├── deployment/     # Operator setup guides (device-setup.md, attester-setup.md)
 │   ├── specs/          # Feature specifications
 │   └── stories/        # User stories
 ├── Cargo.toml          # Rust workspace
+├── release.toml        # cargo-release configuration
+├── install-device.sh   # RPi installer (curl | bash)
+├── install-attester.sh # Ubuntu/macOS installer (curl | bash)
 ├── justfile            # Task runner
 └── CLAUDE.md           # AI-assisted development rules
 ```
@@ -119,6 +123,40 @@ GitHub Actions runs on every push and PR to `main`:
 | **lint** | `cargo fmt`, `cargo clippy`, `forge fmt`, `solhint` |
 | **test** | `cargo test`, `forge test` |
 | **e2e** | `just e2e-the-wire` — full end-to-end walking skeleton |
+
+## Release & Installation
+
+HardTrust ships pre-compiled binaries for Raspberry Pi (ARMv7 musl) and Ubuntu/macOS (x86_64 / arm64).
+Releases are published at [github.com/elmol/hardtrust/releases](https://github.com/elmol/hardtrust/releases).
+
+### Install on Raspberry Pi (device binary)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/elmol/hardtrust/main/install-device.sh | bash
+```
+
+Full setup guide: [docs/deployment/device-setup.md](docs/deployment/device-setup.md)
+
+### Install on Ubuntu / macOS (attester binary)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/elmol/hardtrust/main/install-attester.sh | bash
+```
+
+Full setup guide: [docs/deployment/attester-setup.md](docs/deployment/attester-setup.md)
+
+### Cutting a release
+
+```bash
+# Dry run first — see what will happen
+cargo release patch --dry-run
+
+# Cut the release (bumps Cargo.toml, commits, tags, pushes → CI builds binaries)
+cargo release patch    # 0.1.0 → 0.1.1
+cargo release minor    # 0.1.0 → 0.2.0
+```
+
+Requires `cargo-release` (`cargo install cargo-release`). See [release.toml](release.toml) for configuration.
 
 ## License
 
