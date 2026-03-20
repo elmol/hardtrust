@@ -9,6 +9,10 @@ REPO="elmol/hardtrust"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 BINARY="attester"
 
+TMP_DIR=""
+cleanup() { [ -n "${TMP_DIR}" ] && rm -rf "${TMP_DIR}"; }
+trap cleanup EXIT
+
 detect_target() {
   local os arch
   os="$(uname -s)"; arch="$(uname -m)"
@@ -72,17 +76,17 @@ main() {
   artifact="${BINARY}-${version}-${target}"
   base_url="https://github.com/${REPO}/releases/download/${version}"
   echo "Version: ${version} | Target: ${target}"
-  local tmp; tmp="$(mktemp -d)"; trap 'rm -rf "${tmp}"' EXIT
+  TMP_DIR="$(mktemp -d)"
   echo "Downloading ${artifact} ..."
-  curl -fsSL --progress-bar "${base_url}/${artifact}" -o "${tmp}/${BINARY}"
+  curl -fsSL --progress-bar "${base_url}/${artifact}" -o "${TMP_DIR}/${BINARY}"
   local expected
   expected=$(curl -fsSL "${base_url}/${artifact}.sha256" | awk '{print $1}')
-  verify_checksum "${tmp}/${BINARY}" "${expected}"
+  verify_checksum "${TMP_DIR}/${BINARY}" "${expected}"
   echo "Installing to ${INSTALL_DIR}/${BINARY} ..."
   if [ -w "${INSTALL_DIR}" ]; then
-    cp "${tmp}/${BINARY}" "${INSTALL_DIR}/${BINARY}"; chmod +x "${INSTALL_DIR}/${BINARY}"
+    cp "${TMP_DIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"; chmod +x "${INSTALL_DIR}/${BINARY}"
   else
-    sudo cp "${tmp}/${BINARY}" "${INSTALL_DIR}/${BINARY}"; sudo chmod +x "${INSTALL_DIR}/${BINARY}"
+    sudo cp "${TMP_DIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"; sudo chmod +x "${INSTALL_DIR}/${BINARY}"
   fi
   echo "Done. Run 'attester --help' to get started."
 }
