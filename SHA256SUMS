@@ -1,1 +1,3 @@
-# Placeholder — populated by release pipeline
+c1a07016ad5ba06626c1f1040dda251bb09c084cb4d2e38073726f8b2befe4b6  target/release/device
+32365018b09d8226f38c91ae61faf9eebf0809f1db9612e7980334695330b26a  target/release/attester
+a610250465eb5345f3d392dea1c3ad30b84b8e09b7a2ea4c0d2436a51c1d28e9  terrascope/capture.sh

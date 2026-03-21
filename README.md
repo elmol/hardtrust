@@ -92,23 +92,22 @@ For local development with Anvil, the e2e script sets these automatically.
 
 "The Wire" is the end-to-end walking skeleton proving the core value proposition:
 
-> A device that is registered on-chain is **VERIFIED**. A device that is not registered is **UNVERIFIED**.
+> A registered device is **VERIFIED**. An unregistered device is **UNVERIFIED**. A tampered environment is **MISMATCH**.
 
 The full flow in one command:
 
 ```bash
 just e2e-the-wire
-# Expected output: The Wire gate: PASSED
+# Expected output: The Wire gate: PASSED (6 cases)
 ```
 
-What it does:
-1. Starts a local Anvil chain
-2. Deploys the `HardTrustRegistry` contract
-3. Runs `device init` to print device identity (serial + address)
-4. Runs `attester register` to register the device on-chain
-5. Runs `device emit` to write a signed `reading.json` (with real CPU temp or emulated)
-6. Runs `attester verify` on the reading — expects **VERIFIED**
-7. Runs `attester verify` on a fake reading — expects **UNVERIFIED**
+What it tests:
+1. **Reading VERIFIED** — registered device emits signed reading → VERIFIED
+2. **Reading UNVERIFIED** — fake device reading → UNVERIFIED
+3. **Capture VERIFIED** — registered device capture with signed content hash → VERIFIED
+4. **Capture UNVERIFIED** — fake capture → UNVERIFIED
+5. **Environment MATCH** — capture with approved release hashes → MATCH (on-chain)
+6. **Environment MISMATCH** — tampered capture script → MISMATCH (on-chain), signature still VERIFIED
 
 ---
 
@@ -129,6 +128,39 @@ What happens:
 2. The script takes a photo and generates metadata
 3. Device hashes all files, signs the content hash, writes `capture.json`
 4. `attester verify` checks the signature against the on-chain registry
+
+---
+
+## On-Chain Verification
+
+TerraGenesis verifies captures trustlessly on-chain using a view function (free, no gas):
+
+```bash
+# Verify a capture against on-chain registry
+attester verify --file capture.json --contract <address>
+```
+
+The `verifyCapture()` function in the smart contract:
+- Recovers the signer from the ECDSA signature (using OpenZeppelin ECDSA for malleability protection)
+- Checks if the signer is a registered device
+- Optionally compares environment hashes (script + binary) against approved release hashes
+
+### Environment Attestation
+
+Each capture includes environment metadata:
+- `script_hash` — SHA256 of the capture script
+- `binary_hash` — SHA256 of the device binary
+- `hw_serial` — Hardware serial number
+- `camera_info` — Camera model from device tree
+
+Approved release hashes can be set on-chain:
+
+```bash
+attester set-release-hashes \
+  --script-hash <sha256> \
+  --binary-hash <sha256> \
+  --contract <address>
+```
 
 ---
 
@@ -283,6 +315,8 @@ terra-genesis/
 - **Hybrid storage** — device registration on-chain, sensor data off-chain
 - **Single registry contract** — handles both identity and attestation for MVP simplicity
 - **Alloy** for Rust-to-EVM bindings (successor to ethers-rs)
+- **OpenZeppelin ECDSA** for on-chain signature verification — protects against s-malleability, v-validation, zero address
+- **On-chain verification model** — trustless view function (Model B: pre-computed hash, no gas). See [ADR-0010](docs/adr/adr-0010-onchain-verification-model.md)
 
 See [docs/adr/](docs/adr/) for detailed rationale.
 
