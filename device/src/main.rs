@@ -180,10 +180,12 @@ fn run() -> Result<(), Box<dyn Error>> {
             }
 
             // Execute capture command, passing output_dir as $1
-            // Using bash -c "cmd" _ "dir" so $1 is properly set and paths with spaces work
+            // Format: bash -c '<cmd> "$1"' _ <output_dir>
+            // This passes output_dir as an argument to the command (handles spaces in paths)
+            let shell_cmd = format!("{} \"$1\"", cmd);
             let output = std::process::Command::new("bash")
                 .arg("-c")
-                .arg(&cmd)
+                .arg(&shell_cmd)
                 .arg("_")
                 .arg(&output_dir)
                 .output()
