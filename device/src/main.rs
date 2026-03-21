@@ -49,8 +49,8 @@ enum Command {
 }
 
 use device::{
-    collect_capture_files, create_signed_capture, create_signed_reading, init_device,
-    read_temperature, SYSFS_THERMAL_PATH,
+    collect_capture_files, collect_environment, create_signed_capture, create_signed_reading,
+    init_device, read_temperature, SYSFS_THERMAL_PATH,
 };
 
 /// Read hardware serial from device tree, or fall back to an emulated serial.
@@ -215,7 +215,9 @@ fn run() -> Result<(), Box<dyn Error>> {
 
             let serial = read_serial();
             let timestamp = Utc::now().to_rfc3339();
-            let capture = create_signed_capture(&signing_key, serial, timestamp, files)?;
+            let environment = collect_environment(&cmd, &serial);
+            let capture =
+                create_signed_capture(&signing_key, serial, timestamp, files, environment)?;
 
             let json = serde_json::to_string_pretty(&capture)
                 .map_err(|e| format!("failed to serialize capture: {e}"))?;

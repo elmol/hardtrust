@@ -1,5 +1,6 @@
 use hardtrust_protocol::{
-    public_key_to_address, sign, sign_reading, Capture, CaptureFile, ProtocolError, Reading,
+    public_key_to_address, sign, sign_reading, Capture, CaptureEnvironment, CaptureFile,
+    ProtocolError, Reading,
 };
 use k256::ecdsa::SigningKey;
 use rand::Rng;
@@ -121,14 +122,67 @@ pub fn collect_capture_files(
     Ok(files)
 }
 
+/// Collect environment information for capture attestation.
+pub fn collect_environment(cmd: &str, serial: &str) -> CaptureEnvironment {
+    // script_hash: hash the script file (first token of cmd)
+    let script_path = cmd.split_whitespace().next().unwrap_or(cmd);
+    let script_hash = if let Ok(hash) = hash_file(Path::new(script_path)) {
+        hash
+    } else {
+        "sha256:unknown".to_string()
+    };
+
+    // binary_hash: hash of /proc/self/exe (Linux only)
+    let binary_hash =
+        hash_file(Path::new("/proc/self/exe")).unwrap_or_else(|_| "sha256:unknown".to_string());
+
+    // camera_info: try v4l2-ctl, then /proc/device-tree/model, then "unknown"
+    let camera_info = detect_camera_info();
+
+    CaptureEnvironment {
+        script_hash,
+        binary_hash,
+        hw_serial: serial.to_string(),
+        camera_info,
+    }
+}
+
+/// Detect camera information from the system.
+fn detect_camera_info() -> String {
+    // Try v4l2-ctl --list-devices
+    if let Ok(output) = std::process::Command::new("v4l2-ctl")
+        .arg("--list-devices")
+        .output()
+    {
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if let Some(first_line) = stdout.lines().next() {
+                let trimmed = first_line.trim();
+                if !trimmed.is_empty() {
+                    return trimmed.to_string();
+                }
+            }
+        }
+    }
+
+    // Fallback: /proc/device-tree/model
+    if let Ok(model) = fs::read_to_string("/proc/device-tree/model") {
+        let trimmed = model.trim().trim_end_matches('\0');
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+
+    "unknown".to_string()
+}
+
 /// Construct and sign a `Capture` from the given key and captured files.
-///
-/// Pure: timestamp is an explicit parameter. No file I/O.
 pub fn create_signed_capture(
     signing_key: &SigningKey,
     serial: String,
     timestamp: String,
     files: Vec<CaptureFile>,
+    environment: CaptureEnvironment,
 ) -> Result<Capture, ProtocolError> {
     let address = public_key_to_address(signing_key.verifying_key());
     let content_hash = compute_content_hash(&files);
@@ -138,6 +192,7 @@ pub fn create_signed_capture(
         timestamp,
         content_hash,
         files,
+        environment,
         signature: String::new(),
     };
     capture.signature = sign(signing_key, &capture)?;
@@ -147,7 +202,7 @@ pub fn create_signed_capture(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hardtrust_protocol::{public_key_to_address, verify, verify_reading};
+    use hardtrust_protocol::{public_key_to_address, verify, verify_reading, CaptureEnvironment};
     use std::io::Write;
 
     fn test_signing_key() -> SigningKey {
@@ -336,11 +391,18 @@ mod tests {
                 .to_string(),
             size: 5,
         }];
+        let environment = CaptureEnvironment {
+            script_hash: "sha256:aaa111".to_string(),
+            binary_hash: "sha256:bbb222".to_string(),
+            hw_serial: "TEST-HW-001".to_string(),
+            camera_info: "mock-camera".to_string(),
+        };
         let capture = create_signed_capture(
             &key,
             "TEST-001".to_string(),
             "2026-01-01T00:00:00Z".to_string(),
             files,
+            environment,
         )
         .expect("valid capture");
         assert!(verify(&capture, address));
@@ -356,11 +418,18 @@ mod tests {
             size: 5,
         }];
         let expected_content_hash = compute_content_hash(&files);
+        let environment = CaptureEnvironment {
+            script_hash: "sha256:aaa111".to_string(),
+            binary_hash: "sha256:bbb222".to_string(),
+            hw_serial: "TEST-HW-001".to_string(),
+            camera_info: "mock-camera".to_string(),
+        };
         let capture = create_signed_capture(
             &key,
             "TEST-001".to_string(),
             "2026-01-01T00:00:00Z".to_string(),
             files,
+            environment,
         )
         .expect("valid capture");
         assert_eq!(capture.content_hash, expected_content_hash);
