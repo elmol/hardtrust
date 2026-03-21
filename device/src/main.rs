@@ -57,7 +57,7 @@ use device::{
 fn read_serial() -> String {
     let hw = std::fs::read_to_string("/sys/firmware/devicetree/base/serial-number")
         .ok()
-        .map(|s| s.trim().to_string())
+        .map(|s| s.trim().trim_end_matches('\0').to_string())
         .filter(|s| !s.is_empty());
 
     if let Some(serial) = hw {
@@ -899,6 +899,65 @@ mod tests {
         let capture: Capture = serde_json::from_str(&contents).unwrap();
         assert_eq!(capture.files.len(), 1);
         assert_eq!(capture.files[0].name, "test.txt");
+    }
+
+    #[test]
+    fn serial_has_no_trailing_null_byte() {
+        // Regression test: RPi device tree serial includes a trailing \0 which
+        // must be stripped so that init serial == capture serial == registered serial.
+        let home_dir = tempfile::tempdir().unwrap();
+        let work_dir = tempfile::tempdir().unwrap();
+        let output_dir = work_dir.path().join("output");
+
+        // Get serial from init (first call creates the key and prints Serial:)
+        let init_out = Command::new(device_bin())
+            .args(["init"])
+            .env("HOME", home_dir.path())
+            .output()
+            .expect("failed to run device init");
+        let init_stdout = String::from_utf8(init_out.stdout).unwrap();
+        let init_serial = init_stdout
+            .lines()
+            .find(|l| l.starts_with("Serial:"))
+            .unwrap()
+            .trim_start_matches("Serial:")
+            .trim()
+            .to_string();
+
+        // Get serial from capture
+        let capture_out = Command::new(device_bin())
+            .args([
+                "capture",
+                "--cmd",
+                "echo test > \"$1/test.txt\"",
+                "--output-dir",
+            ])
+            .arg(&output_dir)
+            .env("HOME", home_dir.path())
+            .current_dir(work_dir.path())
+            .output()
+            .expect("failed to run device capture");
+        assert!(capture_out.status.success());
+
+        let contents = std::fs::read_to_string(work_dir.path().join("capture.json")).unwrap();
+        let capture: Capture = serde_json::from_str(&contents).unwrap();
+
+        // Neither serial should contain null bytes
+        assert!(
+            !init_serial.contains('\0'),
+            "init serial contains null byte: {:?}",
+            init_serial
+        );
+        assert!(
+            !capture.serial.contains('\0'),
+            "capture serial contains null byte: {:?}",
+            capture.serial
+        );
+        // Both serials must match
+        assert_eq!(
+            init_serial, capture.serial,
+            "init serial and capture serial must match"
+        );
     }
 
     #[test]
