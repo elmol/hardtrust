@@ -14,3 +14,5 @@ contracts/node_modules/
 
 # Generated test artifacts
 reading.json
+capture.json
+capture-output/
