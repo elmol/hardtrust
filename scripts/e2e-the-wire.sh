@@ -111,6 +111,12 @@ cat > fake-capture.json <<'FAKEJSON'
   "files": [
     { "name": "fake.jpg", "hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111", "size": 100 }
   ],
+  "environment": {
+    "script_hash": "sha256:fake",
+    "binary_hash": "sha256:fake",
+    "hw_serial": "FAKE-HW",
+    "camera_info": "fake-camera"
+  },
   "signature": "0xFAKESIG"
 }
 FAKEJSON
@@ -126,9 +132,64 @@ if [[ "$UNVERIFIED_CAPTURE" == *"VERIFIED"* && "$UNVERIFIED_CAPTURE" != *"UNVERI
 fi
 echo "Case 4: Capture UNVERIFIED — OK"
 
+# === CASE 5: Environment MATCH with --release-hashes ===
+echo ""
+echo "=== Case 5: Environment MATCH ==="
+
+# Build SHA256SUMS from the actual capture
+SCRIPT_HASH=$(sha256sum ./scripts/mock-capture.sh | awk '{print "sha256:" $1}')
+BINARY_HASH=$(jq -r '.environment.binary_hash' capture.json)
+cat > SHA256SUMS <<EOF
+${SCRIPT_HASH}  terrascope-capture.sh
+${BINARY_HASH}  device-armv7
+EOF
+
+VERIFY_ENV=$(cargo run --bin attester -- verify \
+  --file capture.json \
+  --contract "$CONTRACT_ADDRESS" \
+  --release-hashes SHA256SUMS)
+echo "$VERIFY_ENV"
+
+if [[ "$VERIFY_ENV" != *"MATCH"* ]]; then
+    echo "The Wire gate: FAILED — expected MATCH for environment hashes"
+    exit 1
+fi
+echo "Case 5: Environment MATCH — OK"
+
+# === CASE 6: Environment MISMATCH (tampered script) ===
+echo ""
+echo "=== Case 6: Environment MISMATCH ==="
+
+# Create a tampered capture script
+cp ./scripts/mock-capture.sh /tmp/tampered-capture.sh
+echo "# tampered" >> /tmp/tampered-capture.sh
+chmod +x /tmp/tampered-capture.sh
+
+rm -rf capture-output capture.json
+cargo run --bin device -- capture \
+  --cmd "/tmp/tampered-capture.sh" \
+  --output-dir ./capture-output
+
+VERIFY_TAMPERED=$(cargo run --bin attester -- verify \
+  --file capture.json \
+  --contract "$CONTRACT_ADDRESS" \
+  --release-hashes SHA256SUMS)
+echo "$VERIFY_TAMPERED"
+
+if [[ "$VERIFY_TAMPERED" != *"VERIFIED"* ]]; then
+    echo "The Wire gate: FAILED — tampered capture should still have VERIFIED signature"
+    exit 1
+fi
+if [[ "$VERIFY_TAMPERED" != *"MISMATCH"* ]]; then
+    echo "The Wire gate: FAILED — expected MISMATCH for tampered script hash"
+    exit 1
+fi
+echo "Case 6: Environment MISMATCH (signature still VERIFIED) — OK"
+
 # Cleanup
-rm -f fake-reading.json fake-capture.json capture.json reading.json
+rm -f fake-reading.json fake-capture.json capture.json reading.json SHA256SUMS
 rm -rf capture-output
+rm -f /tmp/tampered-capture.sh
 
 echo ""
-echo "The Wire gate: PASSED (4 cases — reading verified/unverified + capture verified/unverified)"
+echo "The Wire gate: PASSED (6 cases — reading verified/unverified + capture verified/unverified + env match/mismatch)"
