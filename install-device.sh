@@ -84,6 +84,22 @@ main() {
   else
     sudo cp "${TMP_DIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"; sudo chmod +x "${INSTALL_DIR}/${BINARY}"
   fi
+
+  # Install capture script
+  local capture_url="${base_url}/terrascope-capture.sh"
+  local capture_dir="/usr/local/lib/terrascope"
+  echo "Installing capture script to ${capture_dir}/capture.sh ..."
+  curl -fsSL "${capture_url}" -o "${TMP_DIR}/capture.sh"
+  if [ -w "$(dirname "${capture_dir}")" ]; then
+    mkdir -p "${capture_dir}"
+    cp "${TMP_DIR}/capture.sh" "${capture_dir}/capture.sh"
+    chmod +x "${capture_dir}/capture.sh"
+  else
+    sudo mkdir -p "${capture_dir}"
+    sudo cp "${TMP_DIR}/capture.sh" "${capture_dir}/capture.sh"
+    sudo chmod +x "${capture_dir}/capture.sh"
+  fi
+
   echo "Done. Run 'device --help' to get started."
 }
 main "$@"

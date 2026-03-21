@@ -37,8 +37,9 @@ enum Command {
     /// directory, computes SHA-256 hashes, signs the manifest, and writes
     /// capture.json to the current directory.
     Capture {
-        /// Command to execute for capturing data
-        #[arg(long)]
+        /// Command to execute for capturing data.
+        /// Defaults to /usr/local/lib/terrascope/capture.sh
+        #[arg(long, default_value = "/usr/local/lib/terrascope/capture.sh")]
         cmd: String,
 
         /// Directory where the capture command writes its output files
@@ -146,6 +147,16 @@ fn run() -> Result<(), Box<dyn Error>> {
             }
         }
         Command::Capture { cmd, output_dir } => {
+            const DEFAULT_CAPTURE_SCRIPT: &str = "/usr/local/lib/terrascope/capture.sh";
+
+            // Check if using default path and it doesn't exist
+            if cmd == DEFAULT_CAPTURE_SCRIPT && !std::path::Path::new(&cmd).exists() {
+                return Err(format!(
+                    "Default capture script not found at {}\n       Install it with: curl -fsSL https://raw.githubusercontent.com/biotexturas/terra-genesis/main/install-device.sh | bash\n       Or specify a custom script: device capture --cmd ./my-script.sh",
+                    DEFAULT_CAPTURE_SCRIPT
+                ).into());
+            }
+
             let home = std::env::var("HOME").map_err(|_| "HOME environment variable not set")?;
             let key_path = std::path::PathBuf::from(&home)
                 .join(".hardtrust")
@@ -168,10 +179,11 @@ fn run() -> Result<(), Box<dyn Error>> {
             std::fs::create_dir_all(&output_dir)
                 .map_err(|e| format!("failed to create output dir: {e}"))?;
 
-            // Execute capture command
+            // Execute capture command, passing output_dir as argument
+            let full_cmd = format!("{} {}", cmd, output_dir.display());
             let output = std::process::Command::new("bash")
                 .arg("-c")
-                .arg(&cmd)
+                .arg(&full_cmd)
                 .output()
                 .map_err(|e| format!("failed to execute capture command: {e}"))?;
 
@@ -755,5 +767,63 @@ mod tests {
 
         let manifest_names: Vec<String> = capture.files.iter().map(|f| f.name.clone()).collect();
         assert_eq!(manifest_names, actual_files);
+    }
+
+    // --- Default --cmd tests ---
+
+    #[test]
+    fn capture_without_cmd_uses_default_path_and_shows_error_when_missing() {
+        let home_dir = tempfile::tempdir().unwrap();
+        let work_dir = tempfile::tempdir().unwrap();
+        init_device_key(home_dir.path());
+
+        // Run without --cmd, default script won't exist
+        let output = Command::new(device_bin())
+            .args(["capture", "--output-dir"])
+            .arg(work_dir.path().join("output"))
+            .env("HOME", home_dir.path())
+            .current_dir(work_dir.path())
+            .output()
+            .expect("failed to run device capture");
+
+        assert!(!output.status.success());
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            stderr.contains("Default capture script not found"),
+            "expected helpful error about missing default script, got: {stderr}"
+        );
+        assert!(
+            stderr.contains("/usr/local/lib/terrascope/capture.sh"),
+            "should mention the default path, got: {stderr}"
+        );
+        assert!(
+            stderr.contains("--cmd"),
+            "should suggest --cmd override, got: {stderr}"
+        );
+    }
+
+    #[test]
+    fn capture_with_explicit_cmd_still_works() {
+        let home_dir = tempfile::tempdir().unwrap();
+        let work_dir = tempfile::tempdir().unwrap();
+        let output_dir = work_dir.path().join("output");
+        init_device_key(home_dir.path());
+
+        let cmd = format!("echo override > {}/test.txt", output_dir.display());
+        let output = Command::new(device_bin())
+            .args(["capture", "--cmd", &cmd, "--output-dir"])
+            .arg(&output_dir)
+            .env("HOME", home_dir.path())
+            .current_dir(work_dir.path())
+            .output()
+            .expect("failed to run device capture");
+
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            output.status.success(),
+            "explicit --cmd should work: stdout={stdout} stderr={stderr}"
+        );
+        assert!(stdout.contains("Wrote capture.json"), "stdout: {stdout}");
     }
 }
