@@ -75,6 +75,19 @@ See [docs/architecture.md](docs/architecture.md) for the full technical architec
 
 ---
 
+## Configuration
+
+| Env Var | Required | Default | Description |
+|---------|----------|---------|-------------|
+| `HARDTRUST_PRIVATE_KEY` | Yes (for `register`) | — | Attester signing key (hex, e.g. `0x...`) |
+| `HARDTRUST_RPC_URL` | No | `http://127.0.0.1:8545` | Ethereum JSON-RPC endpoint |
+| `TERRASCOPE_RESOLUTION` | No | `1920x1080` | Capture resolution |
+| `TERRASCOPE_QUALITY` | No | `90` | JPEG quality (1-100) |
+
+For local development with Anvil, the e2e script sets these automatically.
+
+---
+
 ## The Wire — Walking Skeleton
 
 "The Wire" is the end-to-end walking skeleton proving the core value proposition:
@@ -119,6 +132,18 @@ What happens:
 
 ---
 
+## CI
+
+GitHub Actions runs on every push and PR to `main`:
+
+| Job | What it checks |
+|-----|----------------|
+| **lint** | `cargo fmt`, `cargo clippy`, `forge fmt`, `solhint` |
+| **test** | `cargo test`, `forge test` |
+| **e2e** | `just e2e-the-wire` — full end-to-end (readings + captures) |
+
+---
+
 ## Quick Start
 
 ### Prerequisites
@@ -156,6 +181,39 @@ See [CLAUDE.md](CLAUDE.md) for the full development workflow.
 
 ---
 
+## Release & Installation
+
+TerraGenesis ships pre-compiled binaries for Raspberry Pi (ARMv7 musl) and Ubuntu/macOS (x86_64 / arm64).
+Releases are published at [github.com/biotexturas/terra-genesis/releases](https://github.com/biotexturas/terra-genesis/releases).
+
+### Install on Raspberry Pi (device + capture script)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/biotexturas/terra-genesis/main/install-device.sh | bash
+```
+
+This installs both the `device` binary and the TerraScope capture script.
+Full setup guide: [docs/deployment/device-setup.md](docs/deployment/device-setup.md)
+
+### Install on Ubuntu / macOS (attester binary)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/biotexturas/terra-genesis/main/install-attester.sh | bash
+```
+
+Full setup guide: [docs/deployment/attester-setup.md](docs/deployment/attester-setup.md)
+
+### Cutting a release
+
+```bash
+cargo release patch --dry-run   # preview
+cargo release patch              # 0.1.0 → 0.1.1
+```
+
+Requires `cargo-release` (`cargo install cargo-release`). See [release.toml](release.toml).
+
+---
+
 ## Integration with Landscapes of Opportunity
 
 Within the **Landscapes of Opportunity** ecosystem, TerraGenesis acts as the **data trust layer** for the TerraScope DePIN network.
@@ -175,10 +233,10 @@ This infrastructure connects real ecological observations with digital worlds an
 
 During this hackathon we aim to prototype:
 
-- [ ] Device identity and signing (via HardTrust)
+- [x] Device identity and signing (via HardTrust)
 - [x] Hashing and data capture pipeline
-- [ ] Minimal on-chain proof of data provenance
-- [ ] Simple verification workflow
+- [x] Minimal on-chain proof of data provenance
+- [x] Simple verification workflow
 
 The prototype demonstrates how **open hardware scientific instruments** can produce verifiable on-chain data.
 
@@ -193,25 +251,28 @@ See [docs/proposal.md](docs/proposal.md) for the full hackathon proposal.
 ```
 terra-genesis/
 ├── contracts/          # Solidity (Foundry) — HardTrustRegistry
-│   ├── src/            # Contract source
-│   ├── test/           # Foundry tests
-│   └── script/         # Deploy scripts
-├── device/             # Rust binary — device CLI
-├── attester/           # Rust binary — attester CLI
-├── protocol/           # Rust library — shared protocol (Reading, crypto, errors)
+│   ├── src/
+│   ├── test/
+│   └── script/
+├── device/             # Rust binary — device CLI (init, emit, capture)
+├── attester/           # Rust binary — attester CLI (register, verify)
+├── protocol/           # Rust library — shared protocol (Signable, crypto, types)
 ├── terrascope/         # TerraScope hardware adapter (capture script)
-├── scripts/            # Shell scripts (build, e2e, version check)
+├── scripts/            # Shell scripts (build, e2e, mock-capture, version check)
 ├── docs/
-│   ├── proposal.md     # TerraGenesis hackathon proposal
-│   ├── architecture.md # System architecture
+│   ├── proposal.md     # Hackathon proposal
+│   ├── architecture.md
 │   ├── adr/            # Architecture Decision Records
 │   ├── deployment/     # Operator setup guides
 │   ├── specs/          # Feature specifications
 │   └── stories/        # User stories
 ├── Cargo.toml          # Rust workspace
+├── release.toml        # cargo-release configuration
+├── install-device.sh   # RPi installer (device + capture script)
+├── install-attester.sh # Ubuntu/macOS installer
 ├── justfile            # Task runner
 ├── CLAUDE.md           # AI-assisted development rules
-└── README.md           # This file
+└── README.md
 ```
 
 ---
