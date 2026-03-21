@@ -4,6 +4,7 @@ use k256::ecdsa::SigningKey;
 use rand_core::OsRng;
 use std::error::Error;
 use std::os::unix::fs::PermissionsExt;
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(
@@ -30,9 +31,26 @@ enum Command {
     /// and address, signs the reading, and writes reading.json to the current
     /// directory. Run `device init` first.
     Emit,
+    /// Execute a capture command, hash output files, and produce a signed capture.json.
+    ///
+    /// Runs the given command via `bash -c`, reads all files from the output
+    /// directory, computes SHA-256 hashes, signs the manifest, and writes
+    /// capture.json to the current directory.
+    Capture {
+        /// Command to execute for capturing data
+        #[arg(long)]
+        cmd: String,
+
+        /// Directory where the capture command writes its output files
+        #[arg(long, default_value = "./capture-output")]
+        output_dir: PathBuf,
+    },
 }
 
-use device::{create_signed_reading, init_device, read_temperature, SYSFS_THERMAL_PATH};
+use device::{
+    collect_capture_files, create_signed_capture, create_signed_reading, init_device,
+    read_temperature, SYSFS_THERMAL_PATH,
+};
 
 /// Read hardware serial from device tree, or fall back to an emulated serial.
 fn read_serial() -> String {
@@ -127,13 +145,74 @@ fn run() -> Result<(), Box<dyn Error>> {
                 println!("Wrote reading.json");
             }
         }
+        Command::Capture { cmd, output_dir } => {
+            let home = std::env::var("HOME").map_err(|_| "HOME environment variable not set")?;
+            let key_path = std::path::PathBuf::from(&home)
+                .join(".hardtrust")
+                .join("device.key");
+
+            if !key_path.exists() {
+                return Err("Device not initialized. Run 'device init' first.".into());
+            }
+
+            let key_hex = std::fs::read_to_string(&key_path)
+                .map_err(|_| "device.key contains invalid key data")?
+                .trim()
+                .to_string();
+            let key_bytes =
+                hex::decode(&key_hex).map_err(|_| "device.key contains invalid key data")?;
+            let signing_key = SigningKey::from_slice(&key_bytes)
+                .map_err(|_| "device.key contains invalid key data")?;
+
+            // Create output dir if needed
+            std::fs::create_dir_all(&output_dir)
+                .map_err(|e| format!("failed to create output dir: {e}"))?;
+
+            // Execute capture command
+            let output = std::process::Command::new("bash")
+                .arg("-c")
+                .arg(&cmd)
+                .output()
+                .map_err(|e| format!("failed to execute capture command: {e}"))?;
+
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                return Err(format!(
+                    "capture command failed (exit {}): {}",
+                    output.status.code().unwrap_or(-1),
+                    stderr.trim()
+                )
+                .into());
+            }
+
+            // Collect and hash files
+            let files = collect_capture_files(&output_dir)
+                .map_err(|e| format!("failed to read output dir: {e}"))?;
+
+            if files.is_empty() {
+                return Err(format!(
+                    "ERROR: No files found in {} after command",
+                    output_dir.display()
+                )
+                .into());
+            }
+
+            let serial = read_serial();
+            let timestamp = Utc::now().to_rfc3339();
+            let capture = create_signed_capture(&signing_key, serial, timestamp, files)?;
+
+            let json = serde_json::to_string_pretty(&capture)
+                .map_err(|e| format!("failed to serialize capture: {e}"))?;
+            std::fs::write("capture.json", &json).map_err(|_| "failed to write capture.json")?;
+            println!("Wrote capture.json ({} file(s))", capture.files.len());
+        }
     }
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use hardtrust_protocol::Reading;
+    use hardtrust_protocol::{Capture, Reading};
     use std::process::Command;
 
     fn device_bin() -> std::path::PathBuf {
@@ -484,5 +563,197 @@ mod tests {
             !work_dir.path().join("reading.json").exists(),
             "reading.json should not be written"
         );
+    }
+
+    // --- Capture integration tests ---
+
+    fn init_device_key(home_dir: &std::path::Path) {
+        Command::new(device_bin())
+            .args(["init"])
+            .env("HOME", home_dir)
+            .output()
+            .expect("failed to run device init");
+    }
+
+    #[test]
+    fn capture_single_file_produces_valid_capture_json() {
+        let home_dir = tempfile::tempdir().unwrap();
+        let work_dir = tempfile::tempdir().unwrap();
+        let output_dir = work_dir.path().join("output");
+        init_device_key(home_dir.path());
+
+        let cmd = format!("echo hello > {}/test.txt", output_dir.display());
+        let output = Command::new(device_bin())
+            .args(["capture", "--cmd", &cmd, "--output-dir"])
+            .arg(&output_dir)
+            .env("HOME", home_dir.path())
+            .current_dir(work_dir.path())
+            .output()
+            .expect("failed to run device capture");
+
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            output.status.success(),
+            "capture failed: stdout={stdout} stderr={stderr}"
+        );
+        assert!(stdout.contains("Wrote capture.json"), "stdout: {stdout}");
+
+        let contents = std::fs::read_to_string(work_dir.path().join("capture.json")).unwrap();
+        let capture: Capture = serde_json::from_str(&contents).unwrap();
+        assert_eq!(capture.files.len(), 1);
+        assert_eq!(capture.files[0].name, "test.txt");
+        assert!(capture.files[0].hash.starts_with("sha256:"));
+        assert!(capture.signature.starts_with("0x") && capture.signature.len() == 132);
+    }
+
+    #[test]
+    fn capture_multiple_files_deterministic_content_hash() {
+        let home_dir = tempfile::tempdir().unwrap();
+        let work_dir = tempfile::tempdir().unwrap();
+        let output_dir = work_dir.path().join("output");
+        init_device_key(home_dir.path());
+
+        let cmd = format!(
+            "echo alpha > {0}/a.txt && echo bravo > {0}/b.txt",
+            output_dir.display()
+        );
+        let output = Command::new(device_bin())
+            .args(["capture", "--cmd", &cmd, "--output-dir"])
+            .arg(&output_dir)
+            .env("HOME", home_dir.path())
+            .current_dir(work_dir.path())
+            .output()
+            .expect("failed to run device capture");
+
+        assert!(output.status.success());
+        let contents = std::fs::read_to_string(work_dir.path().join("capture.json")).unwrap();
+        let capture: Capture = serde_json::from_str(&contents).unwrap();
+        assert_eq!(capture.files.len(), 2);
+        // Files sorted alphabetically
+        assert_eq!(capture.files[0].name, "a.txt");
+        assert_eq!(capture.files[1].name, "b.txt");
+        assert!(capture.content_hash.starts_with("sha256:"));
+    }
+
+    #[test]
+    fn capture_command_failure_aborts_with_error() {
+        let home_dir = tempfile::tempdir().unwrap();
+        let work_dir = tempfile::tempdir().unwrap();
+        let output_dir = work_dir.path().join("output");
+        init_device_key(home_dir.path());
+
+        let output = Command::new(device_bin())
+            .args(["capture", "--cmd", "exit 1", "--output-dir"])
+            .arg(&output_dir)
+            .env("HOME", home_dir.path())
+            .current_dir(work_dir.path())
+            .output()
+            .expect("failed to run device capture");
+
+        assert!(!output.status.success());
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains("Error:"), "stderr: {stderr}");
+        assert!(
+            !work_dir.path().join("capture.json").exists(),
+            "capture.json should not be written"
+        );
+    }
+
+    #[test]
+    fn capture_empty_output_aborts_with_error() {
+        let home_dir = tempfile::tempdir().unwrap();
+        let work_dir = tempfile::tempdir().unwrap();
+        let output_dir = work_dir.path().join("output");
+        init_device_key(home_dir.path());
+
+        // Command succeeds but produces no files
+        let output = Command::new(device_bin())
+            .args(["capture", "--cmd", "true", "--output-dir"])
+            .arg(&output_dir)
+            .env("HOME", home_dir.path())
+            .current_dir(work_dir.path())
+            .output()
+            .expect("failed to run device capture");
+
+        assert!(!output.status.success());
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            stderr.contains("No files found"),
+            "expected 'No files found' error, got: {stderr}"
+        );
+    }
+
+    #[test]
+    fn capture_signature_verifies_with_protocol() {
+        let home_dir = tempfile::tempdir().unwrap();
+        let work_dir = tempfile::tempdir().unwrap();
+        let output_dir = work_dir.path().join("output");
+        init_device_key(home_dir.path());
+
+        let cmd = format!("echo test > {}/file.txt", output_dir.display());
+        Command::new(device_bin())
+            .args(["capture", "--cmd", &cmd, "--output-dir"])
+            .arg(&output_dir)
+            .env("HOME", home_dir.path())
+            .current_dir(work_dir.path())
+            .output()
+            .expect("failed to run device capture");
+
+        let contents = std::fs::read_to_string(work_dir.path().join("capture.json")).unwrap();
+        let capture: Capture = serde_json::from_str(&contents).unwrap();
+
+        // Load key and verify
+        let key_hex = std::fs::read_to_string(home_dir.path().join(".hardtrust/device.key"))
+            .unwrap()
+            .trim()
+            .to_string();
+        let key_bytes = hex::decode(&key_hex).unwrap();
+        let signing_key = k256::ecdsa::SigningKey::from_slice(&key_bytes).unwrap();
+        let address = hardtrust_protocol::public_key_to_address(signing_key.verifying_key());
+        assert!(
+            hardtrust_protocol::verify(&capture, address),
+            "capture signature should verify"
+        );
+    }
+
+    #[test]
+    fn capture_file_manifest_matches_output() {
+        let home_dir = tempfile::tempdir().unwrap();
+        let work_dir = tempfile::tempdir().unwrap();
+        let output_dir = work_dir.path().join("output");
+        init_device_key(home_dir.path());
+
+        let cmd = format!(
+            "echo one > {0}/x.txt && echo two > {0}/y.txt",
+            output_dir.display()
+        );
+        Command::new(device_bin())
+            .args(["capture", "--cmd", &cmd, "--output-dir"])
+            .arg(&output_dir)
+            .env("HOME", home_dir.path())
+            .current_dir(work_dir.path())
+            .output()
+            .expect("failed to run device capture");
+
+        let contents = std::fs::read_to_string(work_dir.path().join("capture.json")).unwrap();
+        let capture: Capture = serde_json::from_str(&contents).unwrap();
+
+        // Verify manifest matches actual files
+        let mut actual_files: Vec<String> = std::fs::read_dir(&output_dir)
+            .unwrap()
+            .filter_map(|e| {
+                let e = e.ok()?;
+                if e.file_type().ok()?.is_file() {
+                    Some(e.file_name().to_string_lossy().to_string())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        actual_files.sort();
+
+        let manifest_names: Vec<String> = capture.files.iter().map(|f| f.name.clone()).collect();
+        assert_eq!(manifest_names, actual_files);
     }
 }
