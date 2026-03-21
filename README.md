@@ -1,8 +1,79 @@
-# HardTrust
+# TerraGenesis
 
-DePIN device identity and attestation system.
+> Proof-of-Physical-Data Layer for Microscopy
 
-HardTrust enables physical devices (starting with Raspberry Pi) to cryptographically prove their identity and attest sensor readings on-chain. Devices sign data with secp256k1 keys, and an EVM smart contract verifies those signatures — creating a trustless bridge between hardware and blockchain.
+[![Status](https://img.shields.io/badge/status-hackathon%20prototype-orange)](https://github.com/biotexturas/terra-genesis)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![DeSci](https://img.shields.io/badge/domain-DeSci-green)](docs/proposal.md)
+
+---
+
+## Overview
+
+**TerraGenesis** is a lightweight infrastructure layer that provides cryptographically verifiable provenance for biological data captured by physical microscopes.
+
+Built on top of [TerraScope](docs/proposal.md#integration-with-landscapes-of-opportunity) — the DIY robotic microscope developed within the **Biotexturas / Landscapes of Opportunity** initiative — TerraGenesis explores how biological observations can become trustworthy digital artifacts anchored on-chain.
+
+By linking physical microscopy with blockchain-based data provenance, TerraGenesis enables new infrastructure for **decentralized science (DeSci)**, open biotech, and biological data economies.
+
+---
+
+## Built on HardTrust
+
+TerraGenesis is a specific application of [HardTrust](https://github.com/elmol/hardtrust), a generic **DePIN device identity and attestation framework**.
+
+HardTrust enables any physical device to cryptographically prove its identity and attest data on-chain using secp256k1/ECDSA signatures verified by an EVM smart contract. TerraGenesis specializes this framework for **TerraScope microscopes**, turning biological image captures into verifiable on-chain records.
+
+| Layer | Role |
+|-------|------|
+| **HardTrust** | Generic device identity, signing, and on-chain attestation |
+| **TerraGenesis** | HardTrust applied to TerraScope microscopes for DeSci data provenance |
+
+---
+
+## The Problem
+
+Scientific images and biological datasets are easily copied, altered, or detached from their physical source. In decentralized or community-driven research environments:
+
+- There is no reliable way to prove **where** a biological observation originated.
+- Datasets lack cryptographic provenance linking them to real instruments.
+- Physical scientific infrastructure cannot easily integrate with **Web3** or decentralized data ecosystems.
+
+---
+
+## The Solution
+
+TerraGenesis introduces a minimal system allowing biological images captured by TerraScope microscopes to be:
+
+1. **Cryptographically hashed** at capture time
+2. **Signed** by the capturing device
+3. **Anchored on-chain** as an immutable proof of capture
+
+This creates a verifiable record that a specific instrument generated a specific dataset at a specific moment in time.
+
+> Rather than claiming absolute physical truth, TerraGenesis focuses on establishing **cryptographic provenance from authorized physical instruments**.
+
+---
+
+## Architecture (MVP)
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    TerraGenesis MVP                      │
+├─────────────┬──────────────┬─────────────┬──────────────┤
+│  Device     │  Capture &   │  On-Chain   │  Verify      │
+│  Registry   │  Sign        │  Proof      │  Anyone      │
+│             │              │             │              │
+│  Authorized │  Hash image  │  Device ID  │  Image not   │
+│  TerraScope │  Sign locally│  Image hash │  altered ✓   │
+│  identities │  by device   │  Timestamp  │  Registered  │
+│             │              │             │  source ✓    │
+└─────────────┴──────────────┴─────────────┴──────────────┘
+```
+
+See [docs/architecture.md](docs/architecture.md) for the full technical architecture.
+
+---
 
 ## The Wire — Walking Skeleton
 
@@ -26,35 +97,18 @@ What it does:
 6. Runs `attester verify` on the reading — expects **VERIFIED**
 7. Runs `attester verify` on a fake reading — expects **UNVERIFIED**
 
-## Configuration
+---
 
-The attester binary reads configuration from environment variables:
+## Quick Start
 
-| Env Var | Required | Default | Description |
-|---------|----------|---------|-------------|
-| `HARDTRUST_PRIVATE_KEY` | Yes (for `register`) | — | Attester signing key (hex-encoded, e.g. `0x...`) |
-| `HARDTRUST_RPC_URL` | No | `http://127.0.0.1:8545` | Ethereum JSON-RPC endpoint |
-
-For local development with Anvil, the e2e script sets these automatically.
-
-## Architecture
-
-```
-contracts/       Solidity smart contract (Foundry) — HardTrustRegistry
-device/          Rust binary — device identity and data emission
-attester/        Rust binary — CLI for registration and verification
-protocol/        Rust library — shared protocol types, crypto, and error handling
-```
-
-## Prerequisites
+### Prerequisites
 
 - [Rust](https://rustup.rs/) (stable)
 - [Foundry](https://getfoundry.sh/) (`forge`, `cast`, `anvil`)
 - [just](https://github.com/casey/just) (task runner)
 - [Node.js](https://nodejs.org/) (for `solhint`)
-- [aderyn](https://github.com/Cyfrin/aderyn) (optional, local-only — Solidity static analysis)
 
-## Quick Start
+### Build & Run
 
 ```bash
 # Build everything (contracts first, then Rust crates)
@@ -67,10 +121,10 @@ just test
 just e2e-the-wire
 ```
 
-## Development
+### Development
 
 ```bash
-# Lint (cargo fmt, clippy, forge fmt, solhint, aderyn)
+# Lint (cargo fmt, clippy, forge fmt, solhint)
 just lint
 
 # Full CI (lint + test)
@@ -80,11 +134,45 @@ just ci
 One story per branch, one PR per story. Run `just ci` before every commit.
 See [CLAUDE.md](CLAUDE.md) for the full development workflow.
 
+---
+
+## Integration with Landscapes of Opportunity
+
+Within the **Landscapes of Opportunity** ecosystem, TerraGenesis acts as the **data trust layer** for the TerraScope DePIN network.
+
+It enables:
+
+- Verifiable biological datasets
+- Reproducible community science
+- Trusted data for AI and computational analysis
+- Future digital assets derived from microbial ecosystems
+
+This infrastructure connects real ecological observations with digital worlds and scientific experimentation.
+
+---
+
+## Hackathon Scope
+
+During this hackathon we aim to prototype:
+
+- [ ] Device identity and signing (via HardTrust)
+- [ ] Hashing and data capture pipeline
+- [ ] Minimal on-chain proof of data provenance
+- [ ] Simple verification workflow
+
+The prototype demonstrates how **open hardware scientific instruments** can produce verifiable on-chain data.
+
+> *How can decentralized physical instruments generate trustworthy scientific data in open networks?*
+
+See [docs/proposal.md](docs/proposal.md) for the full hackathon proposal.
+
+---
+
 ## Repository Structure
 
 ```
-hardtrust/
-├── contracts/          # Solidity (Foundry project)
+terra-genesis/
+├── contracts/          # Solidity (Foundry) — HardTrustRegistry
 │   ├── src/            # Contract source
 │   ├── test/           # Foundry tests
 │   └── script/         # Deploy scripts
@@ -93,17 +181,19 @@ hardtrust/
 ├── protocol/           # Rust library — shared protocol (Reading, crypto, errors)
 ├── scripts/            # Shell scripts (build, e2e, version check)
 ├── docs/
+│   ├── proposal.md     # TerraGenesis hackathon proposal
+│   ├── architecture.md # System architecture
 │   ├── adr/            # Architecture Decision Records
-│   ├── deployment/     # Operator setup guides (device-setup.md, attester-setup.md)
+│   ├── deployment/     # Operator setup guides
 │   ├── specs/          # Feature specifications
 │   └── stories/        # User stories
 ├── Cargo.toml          # Rust workspace
-├── release.toml        # cargo-release configuration
-├── install-device.sh   # RPi installer (curl | bash)
-├── install-attester.sh # Ubuntu/macOS installer (curl | bash)
 ├── justfile            # Task runner
-└── CLAUDE.md           # AI-assisted development rules
+├── CLAUDE.md           # AI-assisted development rules
+└── README.md           # This file
 ```
+
+---
 
 ## Key Design Decisions
 
@@ -114,50 +204,15 @@ hardtrust/
 
 See [docs/adr/](docs/adr/) for detailed rationale.
 
-## CI
+---
 
-GitHub Actions runs on every push and PR to `main`:
+## Contributing
 
-| Job | What it checks |
-|-----|----------------|
-| **lint** | `cargo fmt`, `cargo clippy`, `forge fmt`, `solhint` |
-| **test** | `cargo test`, `forge test` |
-| **e2e** | `just e2e-the-wire` — full end-to-end walking skeleton |
+This project is part of the **Biotexturas / Landscapes of Opportunity** initiative.
+Contributions, feedback, and forks are welcome.
 
-## Release & Installation
-
-HardTrust ships pre-compiled binaries for Raspberry Pi (ARMv7 musl) and Ubuntu/macOS (x86_64 / arm64).
-Releases are published at [github.com/elmol/hardtrust/releases](https://github.com/elmol/hardtrust/releases).
-
-### Install on Raspberry Pi (device binary)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/elmol/hardtrust/main/install-device.sh | bash
-```
-
-Full setup guide: [docs/deployment/device-setup.md](docs/deployment/device-setup.md)
-
-### Install on Ubuntu / macOS (attester binary)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/elmol/hardtrust/main/install-attester.sh | bash
-```
-
-Full setup guide: [docs/deployment/attester-setup.md](docs/deployment/attester-setup.md)
-
-### Cutting a release
-
-```bash
-# Dry run first — see what will happen
-cargo release patch --dry-run
-
-# Cut the release (bumps Cargo.toml, commits, tags, pushes → CI builds binaries)
-cargo release patch    # 0.1.0 → 0.1.1
-cargo release minor    # 0.1.0 → 0.2.0
-```
-
-Requires `cargo-release` (`cargo install cargo-release`). See [release.toml](release.toml) for configuration.
+---
 
 ## License
 
-TBD
+MIT

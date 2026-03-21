@@ -1,5 +1,34 @@
 # CLAUDE.md
 
+## What is TerraGenesis?
+
+**TerraGenesis** is a Proof-of-Physical-Data layer for microscopy, providing
+cryptographic provenance for biological images captured by TerraScope DIY
+robotic microscopes. It is built on **HardTrust**, a generic DePIN device
+attestation framework.
+
+- **HardTrust** = generic device identity + on-chain attestation framework
+- **TerraGenesis** = HardTrust applied to TerraScope microscopes for DeSci
+
+See `docs/proposal.md` for the full hackathon proposal.
+
+## Key Terms
+
+| Term | Meaning |
+|------|---------|
+| TerraScope | DIY robotic microscope (open hardware) |
+| TerraGenesis | This project — HardTrust applied to microscopy |
+| HardTrust | The underlying generic DePIN attestation framework |
+| DePIN | Decentralized Physical Infrastructure Network |
+| DeSci | Decentralized Science |
+| Landscapes of Opportunity | Parent initiative / ecosystem |
+| Biotexturas | Community science project this builds on |
+
+## Project Stage
+
+Hackathon prototype. The codebase already has a working walking skeleton (The Wire).
+Next steps focus on adapting HardTrust for the TerraScope microscopy use case.
+
 ## Context Loading
 
 Before implementing any story, read these documents in order:
