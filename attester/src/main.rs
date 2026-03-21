@@ -9,6 +9,14 @@ use attester::{
 use clap::{Parser, Subcommand};
 use hardtrust_protocol::{Capture, Reading};
 
+/// Release hashes embedded at compile time.
+/// In debug builds, this is empty (env check skipped gracefully).
+/// In release builds, it contains the SHA256SUMS from the repo root.
+#[cfg(debug_assertions)]
+const EMBEDDED_RELEASE_HASHES: &str = "";
+#[cfg(not(debug_assertions))]
+const EMBEDDED_RELEASE_HASHES: &str = include_str!("../../SHA256SUMS");
+
 #[derive(serde::Deserialize)]
 #[serde(untagged)]
 enum DeviceData {
@@ -54,7 +62,7 @@ enum Command {
     ///
     /// Reads a reading.json or capture.json file, auto-detects the format,
     /// queries the registry, and prints VERIFIED or UNVERIFIED.
-    /// For captures, prints environment info and optionally checks against known-good hashes.
+    /// For captures, checks environment against embedded release hashes by default.
     Verify {
         /// Path to the reading.json or capture.json file
         #[arg(long)]
@@ -62,9 +70,12 @@ enum Command {
         /// Deployed HardTrustRegistry contract address
         #[arg(long)]
         contract: Address,
-        /// Path to SHA256SUMS file with known-good hashes for environment verification
+        /// Override embedded release hashes with a custom SHA256SUMS file
         #[arg(long)]
         release_hashes: Option<String>,
+        /// Skip environment verification entirely
+        #[arg(long, default_value_t = false)]
+        skip_env_check: bool,
     },
 }
 
@@ -132,6 +143,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             file,
             contract,
             release_hashes,
+            skip_env_check,
         } => {
             let json = std::fs::read_to_string(&file)
                 .map_err(|e| format!("could not read file {file}: {e}"))?;
@@ -170,41 +182,53 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 VerificationResult::Unverified(_) => println!("UNVERIFIED"),
             }
 
-            // Print environment info for captures
+            // Environment verification for captures
             if let DeviceData::Capture(c) = &data {
-                println!("Environment:");
-                if let Some(ref hashes_path) = release_hashes {
-                    let known = parse_release_hashes(hashes_path)?;
-                    print_env_match(
-                        "script_hash",
-                        &c.environment.script_hash,
-                        find_hash(&known, "capture.sh"),
-                    );
-                    print_env_match(
-                        "binary_hash",
-                        &c.environment.binary_hash,
-                        find_hash(&known, "device"),
-                    );
-                } else {
-                    println!("  script_hash:  {}", c.environment.script_hash);
-                    println!("  binary_hash:  {}", c.environment.binary_hash);
+                if !skip_env_check {
+                    let hashes_content = if let Some(ref path) = release_hashes {
+                        std::fs::read_to_string(path).map_err(|e| {
+                            format!("could not read release hashes file {path}: {e}")
+                        })?
+                    } else {
+                        EMBEDDED_RELEASE_HASHES.to_string()
+                    };
+
+                    if hashes_content.trim().is_empty()
+                        || hashes_content.trim().starts_with('#')
+                            && hashes_content.lines().count() <= 1
+                    {
+                        eprintln!(
+                            "Warning: no release hashes available, skipping environment check"
+                        );
+                    } else {
+                        let known = parse_hashes_content(&hashes_content);
+                        println!("Environment:");
+                        print_env_match(
+                            "script_hash",
+                            &c.environment.script_hash,
+                            find_hash(&known, "capture.sh"),
+                        );
+                        print_env_match(
+                            "binary_hash",
+                            &c.environment.binary_hash,
+                            find_hash(&known, "device"),
+                        );
+                        println!("  hw_serial:    {}", c.environment.hw_serial);
+                        println!("  camera_info:  {}", c.environment.camera_info);
+                    }
                 }
-                println!("  hw_serial:    {}", c.environment.hw_serial);
-                println!("  camera_info:  {}", c.environment.camera_info);
             }
         }
     }
     Ok(())
 }
 
-/// Parse a SHA256SUMS file into (hash, filename) pairs.
-fn parse_release_hashes(path: &str) -> Result<Vec<(String, String)>, Box<dyn std::error::Error>> {
-    let contents = std::fs::read_to_string(path)
-        .map_err(|e| format!("could not read release hashes file {path}: {e}"))?;
+/// Parse SHA256SUMS content into (hash, filename) pairs.
+fn parse_hashes_content(contents: &str) -> Vec<(String, String)> {
     let mut entries = Vec::new();
     for line in contents.lines() {
         let line = line.trim();
-        if line.is_empty() {
+        if line.is_empty() || line.starts_with('#') {
             continue;
         }
         // Format: "sha256:hex  filename" or "sha256:hex filename"
@@ -212,7 +236,7 @@ fn parse_release_hashes(path: &str) -> Result<Vec<(String, String)>, Box<dyn std
             entries.push((hash.trim().to_string(), name.trim().to_string()));
         }
     }
-    Ok(entries)
+    entries
 }
 
 /// Find a hash in release entries by partial filename match.
