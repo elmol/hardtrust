@@ -12,7 +12,7 @@
 
 **TerraGenesis** is a lightweight infrastructure layer that provides cryptographically verifiable provenance for biological data captured by physical microscopes.
 
-Built on top of [TerraScope]()(https://github.com/biotexturas/TerraScope) — the DIY robotic microscope developed within the **Biotexturas / Landscapes of Opportunity** initiative — TerraGenesis explores how biological observations can become trustworthy digital artifacts anchored on-chain.
+Built on top of [TerraScope](https://github.com/biotexturas/TerraScope) — the DIY robotic microscope developed within the **Biotexturas / Landscapes of Opportunity** initiative — TerraGenesis explores how biological observations can become trustworthy digital artifacts anchored on-chain.
 
 By linking physical microscopy with blockchain-based data provenance, TerraGenesis enables new infrastructure for **decentralized science (DeSci)**, open biotech, and biological data economies.
 
