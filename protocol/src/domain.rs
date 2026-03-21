@@ -18,6 +18,15 @@ pub struct CaptureFile {
     pub size: u64,
 }
 
+/// Environment metadata captured alongside a capture for attestation.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CaptureEnvironment {
+    pub script_hash: String,
+    pub binary_hash: String,
+    pub hw_serial: String,
+    pub camera_info: String,
+}
+
 /// A signed capture produced by a device after executing an external command.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Capture {
@@ -26,5 +35,6 @@ pub struct Capture {
     pub timestamp: String,
     pub content_hash: String,
     pub files: Vec<CaptureFile>,
+    pub environment: CaptureEnvironment,
     pub signature: String,
 }

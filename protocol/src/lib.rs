@@ -5,7 +5,7 @@ pub mod error;
 pub use crypto::{
     public_key_to_address, reading_prehash, sign, sign_reading, verify, verify_reading, Signable,
 };
-pub use domain::{Capture, CaptureFile, Reading};
+pub use domain::{Capture, CaptureEnvironment, CaptureFile, Reading};
 pub use error::ProtocolError;
 
 #[cfg(test)]
@@ -234,6 +234,15 @@ mod tests {
 
     // --- Capture tests ---
 
+    fn test_environment() -> CaptureEnvironment {
+        CaptureEnvironment {
+            script_hash: "sha256:aaa111".to_string(),
+            binary_hash: "sha256:bbb222".to_string(),
+            hw_serial: "TEST-HW-001".to_string(),
+            camera_info: "mock-camera".to_string(),
+        }
+    }
+
     fn test_capture() -> Capture {
         Capture {
             serial: "TERRA-001".to_string(),
@@ -247,6 +256,7 @@ mod tests {
                     .to_string(),
                 size: 1024,
             }],
+            environment: test_environment(),
             signature: "0x".to_string(),
         }
     }
@@ -307,6 +317,46 @@ mod tests {
         let mut capture = test_capture();
         capture.content_hash = "sha256:abcd".to_string();
         assert!(capture.prehash().is_none());
+    }
+
+    #[test]
+    fn capture_environment_serde_roundtrip() {
+        let env = test_environment();
+        let json = serde_json::to_string(&env).expect("serialize");
+        let deserialized: CaptureEnvironment = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(env, deserialized);
+    }
+
+    #[test]
+    fn capture_prehash_changes_when_script_hash_changes() {
+        let c1 = test_capture();
+        let mut c2 = test_capture();
+        c2.environment.script_hash = "sha256:changed".to_string();
+        assert_ne!(c1.prehash(), c2.prehash());
+    }
+
+    #[test]
+    fn capture_prehash_changes_when_binary_hash_changes() {
+        let c1 = test_capture();
+        let mut c2 = test_capture();
+        c2.environment.binary_hash = "sha256:changed".to_string();
+        assert_ne!(c1.prehash(), c2.prehash());
+    }
+
+    #[test]
+    fn capture_prehash_changes_when_hw_serial_changes() {
+        let c1 = test_capture();
+        let mut c2 = test_capture();
+        c2.environment.hw_serial = "DIFFERENT-HW".to_string();
+        assert_ne!(c1.prehash(), c2.prehash());
+    }
+
+    #[test]
+    fn capture_prehash_changes_when_camera_info_changes() {
+        let c1 = test_capture();
+        let mut c2 = test_capture();
+        c2.environment.camera_info = "different-camera".to_string();
+        assert_ne!(c1.prehash(), c2.prehash());
     }
 
     #[test]

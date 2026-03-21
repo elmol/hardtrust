@@ -62,14 +62,18 @@ impl Signable for Capture {
             .ok()?
             .timestamp() as u64;
 
-        let mut preimage = Vec::with_capacity(92);
-        preimage.extend_from_slice(&serial_hash); // 32
-        preimage.extend_from_slice(&address_bytes); // 20
-        preimage.extend_from_slice(&content_bytes); // 32
-        preimage.extend_from_slice(&ts.to_be_bytes()); // 8
-        debug_assert_eq!(preimage.len(), 92);
+        let mut hasher = Keccak256::new();
+        hasher.update(&serial_hash); // 32
+        hasher.update(&address_bytes); // 20
+        hasher.update(&content_bytes); // 32
+        hasher.update(&ts.to_be_bytes()); // 8
+                                          // environment attestation fields
+        hasher.update(self.environment.script_hash.as_bytes());
+        hasher.update(self.environment.binary_hash.as_bytes());
+        hasher.update(self.environment.hw_serial.as_bytes());
+        hasher.update(self.environment.camera_info.as_bytes());
 
-        Some(Keccak256::digest(&preimage).into())
+        Some(hasher.finalize().into())
     }
 
     fn signature_hex(&self) -> &str {
