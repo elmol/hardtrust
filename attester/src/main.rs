@@ -3,11 +3,11 @@ use alloy::{
     signers::local::PrivateKeySigner, sol,
 };
 use attester::{
-    classify_registration_error, prepare_registration, verify_device, RegistrationError,
+    classify_registration_error, prepare_registration, verify_device_data, RegistrationError,
     VerificationResult,
 };
 use clap::{Parser, Subcommand};
-use hardtrust_protocol::Reading;
+use hardtrust_protocol::{Capture, Reading};
 
 sol!(
     #[sol(rpc)]
@@ -43,13 +43,12 @@ enum Command {
         #[arg(long)]
         contract: Address,
     },
-    /// Verify a device reading against on-chain registration.
+    /// Verify a device reading or capture against on-chain registration.
     ///
-    /// Reads a reading.json file produced by `device emit`, queries the registry,
-    /// and prints VERIFIED if the device address matches the on-chain record,
-    /// or UNVERIFIED if the device is not registered.
+    /// Reads a reading.json or capture.json file, auto-detects the format,
+    /// queries the registry, and prints VERIFIED or UNVERIFIED.
     Verify {
-        /// Path to the reading.json file produced by `device emit`
+        /// Path to the reading.json or capture.json file
         #[arg(long)]
         file: String,
         /// Deployed HardTrustRegistry contract address
@@ -120,22 +119,39 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
         Command::Verify { file, contract } => {
             let json = std::fs::read_to_string(&file)
-                .map_err(|e| format!("could not read reading file {file}: {e}"))?;
-            let reading: Reading =
-                serde_json::from_str(&json).map_err(|e| format!("invalid reading JSON: {e}"))?;
+                .map_err(|e| format!("could not read file {file}: {e}"))?;
 
-            let reg = prepare_registration(&reading.serial);
+            // Auto-detect format: Capture has "content_hash", Reading has "temperature"
+            let (serial, verification) = if json.contains("content_hash") {
+                let capture: Capture = serde_json::from_str(&json)
+                    .map_err(|e| format!("invalid capture JSON: {e}"))?;
+                let reg = prepare_registration(&capture.serial);
+                let provider = ProviderBuilder::new().connect_http(env_rpc_url()?);
+                let registry = HardTrustRegistry::new(contract, &provider);
+                let result = registry
+                    .getDevice(reg.serial_hash)
+                    .call()
+                    .await
+                    .map_err(|e| format!("contract query failed: {e}"))?;
+                let serial = capture.serial.clone();
+                (serial, verify_device_data(&capture, result.deviceAddr))
+            } else {
+                let reading: Reading = serde_json::from_str(&json)
+                    .map_err(|e| format!("invalid reading JSON: {e}"))?;
+                let reg = prepare_registration(&reading.serial);
+                let provider = ProviderBuilder::new().connect_http(env_rpc_url()?);
+                let registry = HardTrustRegistry::new(contract, &provider);
+                let result = registry
+                    .getDevice(reg.serial_hash)
+                    .call()
+                    .await
+                    .map_err(|e| format!("contract query failed: {e}"))?;
+                let serial = reading.serial.clone();
+                (serial, verify_device_data(&reading, result.deviceAddr))
+            };
 
-            let provider = ProviderBuilder::new().connect_http(env_rpc_url()?);
-
-            let registry = HardTrustRegistry::new(contract, &provider);
-            let result = registry
-                .getDevice(reg.serial_hash)
-                .call()
-                .await
-                .map_err(|e| format!("contract query failed: {e}"))?;
-
-            match verify_device(&reading, result.deviceAddr) {
+            let _ = serial; // used in future logging
+            match verification {
                 VerificationResult::Verified => println!("VERIFIED"),
                 VerificationResult::Unverified(_) => println!("UNVERIFIED"),
             }
@@ -351,5 +367,63 @@ mod tests {
             "expected 'Error:' on stderr, got: {stderr}"
         );
         assert!(!stderr.contains("panic"), "should not panic, got: {stderr}");
+    }
+
+    #[test]
+    fn verify_capture_with_bad_json_prints_error() {
+        let tmp = tempfile::NamedTempFile::new().expect("create temp file");
+        // Has content_hash so detected as Capture, but invalid JSON structure
+        std::fs::write(tmp.path(), r#"{"content_hash": "sha256:abc"}"#).unwrap();
+
+        let output = ProcessCommand::new(attester_bin())
+            .args([
+                "verify",
+                "--file",
+                tmp.path().to_str().unwrap(),
+                "--contract",
+                "0x0000000000000000000000000000000000000000",
+            ])
+            .output()
+            .expect("failed to run attester binary");
+
+        assert!(!output.status.success());
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            stderr.contains("Error:"),
+            "expected 'Error:' on stderr, got: {stderr}"
+        );
+        assert!(!stderr.contains("panic"), "should not panic, got: {stderr}");
+    }
+
+    #[test]
+    fn verify_capture_with_missing_fields_prints_error() {
+        let tmp = tempfile::NamedTempFile::new().expect("create temp file");
+        std::fs::write(
+            tmp.path(),
+            r#"{"serial":"X","address":"Y","content_hash":"sha256:abc","timestamp":"Z"}"#,
+        )
+        .unwrap();
+
+        let output = ProcessCommand::new(attester_bin())
+            .args([
+                "verify",
+                "--file",
+                tmp.path().to_str().unwrap(),
+                "--contract",
+                "0x0000000000000000000000000000000000000000",
+            ])
+            .output()
+            .expect("failed to run attester binary");
+
+        assert!(!output.status.success());
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            stderr.contains("Error:"),
+            "expected 'Error:' on stderr, got: {stderr}"
+        );
+        assert!(
+            stderr.contains("missing field"),
+            "expected 'missing field' on stderr, got: {stderr}"
+        );
     }
 }
