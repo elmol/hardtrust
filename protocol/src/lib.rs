@@ -2,8 +2,10 @@ pub mod crypto;
 pub mod domain;
 pub mod error;
 
-pub use crypto::{public_key_to_address, reading_prehash, sign_reading, verify_reading};
-pub use domain::Reading;
+pub use crypto::{
+    public_key_to_address, reading_prehash, sign, sign_reading, verify, verify_reading, Signable,
+};
+pub use domain::{Capture, CaptureFile, Reading};
 pub use error::ProtocolError;
 
 #[cfg(test)]
@@ -228,5 +230,91 @@ mod tests {
         reading.timestamp = "not-a-timestamp".to_string();
         let result = sign_reading(&key, &reading);
         assert!(matches!(result, Err(ProtocolError::InvalidTimestamp(_))));
+    }
+
+    // --- Capture tests ---
+
+    fn test_capture() -> Capture {
+        Capture {
+            serial: "TERRA-001".to_string(),
+            address: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266".to_string(),
+            timestamp: "2026-01-01T00:00:00Z".to_string(),
+            content_hash: "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+                .to_string(),
+            files: vec![CaptureFile {
+                name: "image.png".to_string(),
+                hash: "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+                    .to_string(),
+                size: 1024,
+            }],
+            signature: "0x".to_string(),
+        }
+    }
+
+    fn signed_test_capture() -> (Capture, Address) {
+        let key = test_signing_key();
+        let mut capture = test_capture();
+        capture.signature = sign(&key, &capture).expect("valid capture");
+        let address = public_key_to_address(key.verifying_key());
+        (capture, address)
+    }
+
+    #[test]
+    fn sign_verify_capture_round_trip() {
+        let (capture, address) = signed_test_capture();
+        assert!(verify(&capture, address));
+    }
+
+    #[test]
+    fn capture_tampered_content_hash_fails_verify() {
+        let (mut capture, address) = signed_test_capture();
+        capture.content_hash =
+            "sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string();
+        assert!(!verify(&capture, address));
+    }
+
+    #[test]
+    fn capture_tampered_timestamp_fails_verify() {
+        let (mut capture, address) = signed_test_capture();
+        capture.timestamp = "2025-06-01T00:00:00Z".to_string();
+        assert!(!verify(&capture, address));
+    }
+
+    #[test]
+    fn capture_serializes_deserializes_via_serde() {
+        let capture = test_capture();
+        let json = serde_json::to_string(&capture).expect("serialize");
+        let deserialized: Capture = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(capture, deserialized);
+    }
+
+    #[test]
+    fn capture_prehash_returns_none_for_invalid_address() {
+        let mut capture = test_capture();
+        capture.address = "0xZZZZ".to_string();
+        assert!(capture.prehash().is_none());
+    }
+
+    #[test]
+    fn capture_prehash_returns_none_for_invalid_content_hash() {
+        let mut capture = test_capture();
+        capture.content_hash = "not-sha256-prefixed".to_string();
+        assert!(capture.prehash().is_none());
+    }
+
+    #[test]
+    fn capture_prehash_returns_none_for_short_content_hash() {
+        let mut capture = test_capture();
+        capture.content_hash = "sha256:abcd".to_string();
+        assert!(capture.prehash().is_none());
+    }
+
+    #[test]
+    fn sign_capture_returns_err_for_invalid_payload() {
+        let key = test_signing_key();
+        let mut capture = test_capture();
+        capture.address = "0xZZZZ".to_string();
+        let result = sign(&key, &capture);
+        assert!(matches!(result, Err(ProtocolError::InvalidPayload)));
     }
 }
