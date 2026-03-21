@@ -45,6 +45,13 @@ jobs:
             device-${{ env.RELEASE_VERSION }}-armv7-unknown-linux-musleabihf.sha256
           if-no-files-found: error
 
+      - name: Upload capture script
+        uses: actions/upload-artifact@v4
+        with:
+          name: terrascope-capture
+          path: terrascope/capture.sh
+          if-no-files-found: error
+
   # -------------------------------------------------------
   # Job 2: attester — x86_64 Linux (Ubuntu), native build
   # -------------------------------------------------------
@@ -123,6 +130,9 @@ jobs:
           path: artifacts
           merge-multiple: true
 
+      - name: Rename capture script
+        run: mv artifacts/capture.sh artifacts/terrascope-capture.sh
+
       - name: Aggregate SHA256SUMS
         run: |
           cd artifacts
@@ -153,6 +163,7 @@ jobs:
           | \`device-${RELEASE_VERSION}-armv7-unknown-linux-musleabihf\` | Raspberry Pi / Raspbian 11 ARMv7 |
           | \`attester-${RELEASE_VERSION}-x86_64-unknown-linux-gnu\` | Ubuntu / Linux x86_64 |
           | \`attester-${RELEASE_VERSION}-aarch64-apple-darwin\` | macOS Apple Silicon |
+          | \`terrascope-capture.sh\` | TerraScope capture script (all platforms) |
 
           Verify integrity with \`SHA256SUMS\` or individual \`.sha256\` sidecar files.
 
@@ -184,4 +195,5 @@ jobs:
             artifacts/attester-${{ env.RELEASE_VERSION }}-x86_64-unknown-linux-gnu.sha256
             artifacts/attester-${{ env.RELEASE_VERSION }}-aarch64-apple-darwin
             artifacts/attester-${{ env.RELEASE_VERSION }}-aarch64-apple-darwin.sha256
+            artifacts/terrascope-capture.sh
             artifacts/SHA256SUMS
