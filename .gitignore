@@ -12,6 +12,10 @@ contracts/report.md
 # Node
 contracts/node_modules/
 
+# Demo secrets
+.env.demo
+demo-capture/
+
 # Generated test artifacts
 reading.json
 capture.json
