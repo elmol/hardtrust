@@ -1,0 +1,58 @@
+
+1.- Hook
+
+	Build, rent, or hire (on-chain) your own network of scientific instruments to play games with Natureś microscopic creatures, AI agents and friends alike.
+	TerraScope, a DIY digital robotic microscope you can build with friends at home and which together you can hook it to others in a Decentralized Physical Infrastructure 
+	Network (DePIN) of instruments/game consoles to unravel the secrets of microbial/biological intelligence and discover together how ecosystem function is 
+	constructed right under your own feet. 
+
+
+2.- Problem
+	
+	Today, science is trapped in institutions,credencialism and expensive instrumentation which keeps most potential citizen scientist from realizing their own scientific 
+	potential as curios individuals. AI research agents are themselves closed into digital spaces where reading and reasoning are generating many hypothesis which are waiting 
+	to be tested experimentally. By managing payments, the hope is some of the "best hypothesis" can be tested by hiring centralized research platforms. 		
+	The problem, both for humas and agents are twofold: (i) physical research infrastructure should be cheap, acessible and ubiqutous. 
+	Open Science Hardware (OSH) solves part of this but is often unreliable and not widely availabe to be accessed online; (ii) hypothesis driven science, 
+	know as day science is only part of the picture. Once an amazing observation is made, while playing in the lab often in unrelated actions and topics,
+	hypothesis can emerge and rigurous, rational experiments can be planned. Before that observation is made, a playfull environments where Nature and Serendepity can have a chance is needed. 
+	This is Night Science. To give agents and citizens at large a chance to interact with Nature in a ludic fashion, scientific infrastructure should resemble a playground and scientific 
+	instruments a game console.
+
+	A good laboratory has both (access to instruments and protective safe envirinment where to play). The problem is that access to such spaces is every day hard to find. 
+	Even if proviledge grant us access to expensive equipement, access to a good mentor and a protective playfull lab environment is ever hard to find.
+
+
+3.- Vision
+
+	We envision a decentralized world where people and agents play games accesisng DePIN of instruments to interact with Nature in general and biology in particular.
+	This democratization of scientific research is posible by cheap DIY OSH available to every one to build, access, hack and modify. At the same time, while playful interactions with Nature 
+	take place, serious and rigurous scientific discovery take place. How does biological intelligence implement ecosystem function? Can I trus hardware made at home? 
+	Can statistics across many devices emerge? Can agents learn to operate instruments from humans, intelligence from smart bacteria, and together, playing biotic games unravel the secrets 
+	needed to create sustainability tech needed to remediate our ailing acosyustems? Is intelligence in the end about sustainability and persistance in a challenging environment?
+	Can bacteria teach us and teach our agents? We see a future of intelligent hybridizations of machines, peoples and ecosystems. 
+
+4.- What have you built
+	
+	Building on top of HardTrust, a web3 device verification layer and TerraScope, a digital robotic microscope, we build TerraGenesis. TerraGenesis is the basic web 3 verification layer
+	needed to register a TerraScope machine as node in the DePIN. Furthermore, we also built the software layer needed to attest the provenance of micriscopy data from a registered 
+	TerraScope device. Our software, consist on a device, attestation and blockchain stack. A smart contract running on a local or testnet chain, can store a hash from a device at 
+	registration (attestation) and later verify the provencance of data emited (microscopy images used to track swarming intelligent microbobes exploring a landscape of habitat) 
+	by a given TerraScope. In short our web 3 stack register a device to a DePIN and verify its data on-chain. The stack consist on: (i) Registration device ID, (ii) attestation 
+	of a device validity (able to join the DePIN), (iii) verification of data provenance from the registered device.
+
+
+5.- What  itś different / Insight
+
+	Our web stack allows for the minimal DePIN genesis to occur. We used a single node (TerraScope device) but with our web 3 stack now we can link up several devices and allow for deployed devices 
+	to be reachable by remote users and AI agents alike. With a DePIN of scientific instrumentation, ai research agents can be embodied and access Nature directly rather than through literature 
+	which is contaminated by the narratives of human researchers and publishing practices. Now, citizen scientist can earn a living (via web 3 DeFI, GameFi, etc) while engaging in measureing 
+	Nature and performing experiments themselves. Such DeSci infrastructure act as complement to TradSci and promse to scale up te scope of current scientific research.    	
+
+
+6.- Bigger picture
+
+	TerraGenesis makes the invisible visible and verifiable and turns any agent and citizen into a scientist, a maker, a developer or a player.
+	Currently the most difficult vertical in DeSci is execution of physical experiments and the inclusion of serendepity and physicallity in the hypothesis-based reasoning of agents and 
+	citizen scientist alike. By adding both, a GameFI and DePIN OSH lyer we give agentic and citizen research a physical connection to Nature phenomena oon which to play and 	
+	conduct experiment when serendepitious observations came across.
