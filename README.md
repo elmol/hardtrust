@@ -321,17 +321,52 @@ The prototype demonstrates how **open hardware scientific instruments** can prod
 
 ## What's Next
 
-TerraGenesis is a hackathon prototype. Here's what comes next:
+TerraGenesis is a hackathon prototype. Here's where it goes from here:
+
+### Network & Data
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| **On-chain proof persistence** | Store capture proofs permanently on-chain (not just verify) | Designed (S2b.2) |
-| **Multi-device DePIN** | Connect multiple TerraScopes into a decentralized network | Next milestone |
+| **On-chain proof persistence** | Store capture proofs permanently on-chain, not just verify | Designed |
+| **Multi-device DePIN** | Connect multiple TerraScopes into a decentralized instrument network | Next milestone |
 | **AI agent access** | API endpoints so research agents can trigger captures and verify data remotely | Planned |
+| **Decentralized storage** | IPFS / Arweave for raw microscopy images with on-chain anchoring | Planned |
 | **GameFi layer** | Turn scientific observation into playable experiences — biotic games with real microbes | Vision |
-| **Cross-device statistics** | Aggregate observations from distributed instruments for population-level insights | Vision |
-| **Decentralized storage** | IPFS / Arweave for raw microscopy images with on-chain anchoring | Vision |
-| **Merkle prehash** | Trustless on-chain environment verification without storing individual hashes | Designed (Option B) |
+
+### Device Security Roadmap
+
+TerraGenesis currently provides **Layer 1** security: software-level environment attestation (script hash, binary hash, hardware serial). The roadmap extends this toward hardware-rooted trust:
+
+| Layer | Name | What it adds | Status |
+|-------|------|-------------|--------|
+| **Layer 1** | Software Attestation | Hash verification of capture script + device binary, on-chain environment match | **Implemented** |
+| **Layer 2** | Secure Boot + Firmware Signing | Signed firmware, secure boot chain, private key in secure element (TPM / dedicated chip). Images can only be signed by authorized software | Planned |
+| **Layer 3** | Trusted Execution Environment | Capture occurs inside a TEE — the image never exists unsigned. Hash + sign is atomic | Research |
+
+> No system can prove 100% that the physical world wasn't manipulated. What TerraGenesis proves is that **the data came from an authorized device and was not altered digitally after capture**. And that is already enormous.
+
+### Capture Identity & Physical Fingerprinting
+
+Beyond verifying *which device* captured data, future versions can verify *how* and *whether it's physically consistent*:
+
+| Technique | Description |
+|-----------|-------------|
+| **Sensor Fusion** | Co-sign temperature, humidity, vibration, GPS, and external timestamps alongside the image. The more sensors, the harder to falsify |
+| **Physical Noise Fingerprint** | Each CMOS sensor has unique optical noise patterns and imperfections (e.g., a scratched lens). These can be modeled as a device "biometric" — a hardware fingerprint that's nearly impossible to forge |
+| **Proof-of-Capture Sequence** | Instead of signing individual images, sign a chain: `hash(img₁) → hash(img₂) → hash(img₃)`. Tampering with one breaks the entire sequence, creating **biological time continuity** |
+
+### Intelligent Validation with GenLayer
+
+Traditional EVM contracts can verify signatures but can't *reason* about data. [GenLayer](https://www.genlayer.com/) enables AI-powered smart contracts that can:
+
+| Capability | Example |
+|------------|---------|
+| **Device legitimacy scoring** | Evaluate metadata consistency, compare against known device profiles, flag anomalies (`camera_resolution < threshold → reject`) |
+| **Firmware validation** | Check firmware hash against known versions, flag unknown builds, require human review for unrecognized configurations |
+| **Capture plausibility** | Validate timestamp consistency, detect suspicious image patterns, compare against previous captures from the same device |
+| **Physical fingerprint matching** | Verify that optical noise patterns match the registered sensor profile — detect if the CMOS sensor was swapped or the lens replaced |
+
+This opens the door to **AI-assisted scientific data validation**: not just "was this signed correctly?" but "does this data *look* like it came from a real microscope?"
 
 See [docs/proposal.md](docs/proposal.md) for the full hackathon proposal.
 
