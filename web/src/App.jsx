@@ -16,51 +16,6 @@ const emptyForm = {
   deviceAddress: "",
 };
 
-const storyPoints = [
-  {
-    title: "What HardTrust is",
-    description:
-      "A DePIN identity and attestation system for physical devices, starting with Raspberry Pi deployments.",
-  },
-  {
-    title: "What it proves",
-    description:
-      "That a registered device can be distinguished from an unregistered one, so sensor data has traceable provenance.",
-  },
-  {
-    title: "Why it matters",
-    description:
-      "It creates a trust bridge between hardware in the real world and an on-chain registry anyone can inspect.",
-  },
-];
-
-const workflowSteps = [
-  {
-    step: "1",
-    title: "The device generates identity",
-    description:
-      "The HardTrust device binary creates a secp256k1 keypair on the Raspberry Pi and derives an Ethereum address from it.",
-  },
-  {
-    step: "2",
-    title: "An attester registers it on-chain",
-    description:
-      "A trusted attester confirms the device and sends its serial hash plus device address to the HardTrustRegistry contract.",
-  },
-  {
-    step: "3",
-    title: "The device emits signed readings",
-    description:
-      "The device produces a signed reading with serial, address, temperature, timestamp, and signature.",
-  },
-  {
-    step: "4",
-    title: "Anyone can verify trust",
-    description:
-      "Registered devices resolve as trusted, while unknown devices stay unverified. That contrast is the core of The Wire.",
-  },
-];
-
 class AppErrorBoundary extends Component {
   constructor(props) {
     super(props);
@@ -296,6 +251,12 @@ async function verifyCaptureOnChain(manifest) {
   }
 }
 
+function extractSerialShort(manifest) {
+  if (!manifest?.serial) return "";
+  const serial = manifest.serial.replace(/\0/g, "").trim();
+  return serial.length > 8 ? serial.slice(-8) : serial;
+}
+
 function AppContent() {
   const [devices, setDevices] = useState([]);
   const [attesterAddress, setAttesterAddress] = useState("");
@@ -314,6 +275,7 @@ function AppContent() {
   const [submitting, setSubmitting] = useState(false);
   const [txHash, setTxHash] = useState("");
   const [submitError, setSubmitError] = useState("");
+  const [showRegister, setShowRegister] = useState(false);
   const [verifyingDemoCapture, setVerifyingDemoCapture] = useState(false);
   const [demoVerification, setDemoVerification] = useState(null);
   const [demoVerificationError, setDemoVerificationError] = useState("");
@@ -321,6 +283,7 @@ function AppContent() {
   const [metadataFile, setMetadataFile] = useState(null);
   const [signFile, setSignFile] = useState(null);
   const [capturePreviewUrl, setCapturePreviewUrl] = useState("");
+  const [verifiedManifest, setVerifiedManifest] = useState(null);
 
   const hasContractAddress = Boolean(appConfig.contractAddress);
   const walletChainMatches =
@@ -387,14 +350,12 @@ function AppContent() {
       provider.getNetwork(),
       provider.getBalance(signerAddress),
     ]);
-    console.log(`Wallet on chain ${network.chainId} with balance ${formatEther(balance)} ETH`);
     const authorized = hasContractAddress
       ? await new Contract(appConfig.contractAddress, registryAbi, provider).isAttester(
           signerAddress,
         )
       : false;
 
-    console.log(`Wallet ${signerAddress} is authorized attester: ${authorized}`);
     setWalletAddress(signerAddress);
     setWalletChainId(Number(network.chainId));
     setWalletBalance(Number(formatEther(balance)).toFixed(4));
@@ -402,7 +363,6 @@ function AppContent() {
   }
 
   async function connectWallet() {
-    console.log("Connecting wallet...");
     if (!window.ethereum) {
       setSubmitError("No wallet found. Install MetaMask or another injected wallet.");
       return;
@@ -413,13 +373,10 @@ function AppContent() {
 
     try {
       const provider = new BrowserProvider(window.ethereum);
-      await provider.send("eth_requestAccounts", []); //not working
+      await provider.send("eth_requestAccounts", []);
       const signer = await provider.getSigner();
       const signerAddress = await signer.getAddress();
-      console.log(`Wallet connected: ${signerAddress}`);
       await updateWalletState(provider, signerAddress);
-      console.log(`Connected wallet ${signerAddress} on chain ${walletChainId}`);
-      console.log("Wallet is authorized attester:", isAuthorizedAttester);
     } catch (error) {
       setSubmitError(extractError(error));
     } finally {
@@ -455,7 +412,7 @@ function AppContent() {
     }
 
     if (!isAddress(form.deviceAddress)) {
-      setSubmitError("Enter a valid device wallet address.");
+      setSubmitError("Enter a valid microscope wallet address.");
       return;
     }
 
@@ -516,6 +473,7 @@ function AppContent() {
       const onChain = await verifyCaptureOnChain(manifest);
       const verified = filesVerified && contentHashMatches && onChain.verified;
 
+      setVerifiedManifest(manifest);
       setDemoVerification({
         verified,
         filesVerified,
@@ -528,6 +486,7 @@ function AppContent() {
       });
     } catch (error) {
       setDemoVerification(null);
+      setVerifiedManifest(null);
       setDemoVerificationError(extractError(error));
     } finally {
       setVerifyingDemoCapture(false);
@@ -623,9 +582,12 @@ function AppContent() {
   return (
     <div className="shell">
       <header className="topbar">
-        <div>
-          <p className="eyebrow">HardTrust</p>
-          <h1>Registry control room for verified devices.</h1>
+        <div className="topbar-brand">
+          <img className="topbar-logo" src="/assets/biotexturas-logo.png" alt="biotexturas logo" />
+          <div className="topbar-text">
+            <h1>TerraGenesis</h1>
+            <p className="tagline">Provenance for every observation</p>
+          </div>
         </div>
         <button className="ghost-button" onClick={connectWallet} disabled={connectingWallet}>
           {connectingWallet ? "Connecting..." : walletAddress ? shortAddress(walletAddress) : "Connect wallet"}
@@ -633,20 +595,19 @@ function AppContent() {
       </header>
 
       <main className="layout">
+        {/* --- Hero --- */}
         <section className="hero panel">
           <div className="hero-copy">
-            <p className="kicker">Hardware identity meets on-chain trust</p>
-            <h2>HardTrust helps physical devices prove who they are and where their data comes from.</h2>
+            <p className="kicker">Open microscopy meets on-chain provenance</p>
+            <h2>Prove your microscopy data is real.</h2>
             <p className="lead">
-              HardTrust starts with Raspberry Pi devices. Each device generates its own
-              cryptographic identity, an authorized attester registers it on-chain, and its
-              readings can be checked against that trusted registry. The result is simple: a
-              registered device is trusted, and an unknown device is not.
+              Each TerraScope microscope has its own cryptographic identity. Captures are hashed,
+              signed, and verifiable on-chain — no intermediaries, no trust required.
             </p>
 
             <div className="hero-actions">
-              <a className="primary-button" href="#verify-my-device">
-                Verify my device
+              <a className="primary-button" href="#verify-capture">
+                Verify a capture
               </a>
               <button className="secondary-button" onClick={loadDevices} disabled={loadingDevices}>
                 {loadingDevices ? "Refreshing..." : "Refresh registry"}
@@ -654,231 +615,47 @@ function AppContent() {
             </div>
           </div>
 
-          <div className="hero-meta">
+          <div className="hero-visual">
+            <img className="hero-image" src="/assets/DevicePhoto.jpeg" alt="TerraScope microscope" />
             <article className="stat-card">
-              <span>Core promise</span>
-              <strong>Verified or unverified</strong>
-            </article>
-            <article className="stat-card">
-              <span>Starting hardware</span>
-              <strong>Raspberry Pi</strong>
-            </article>
-            <article className="stat-card">
-              <span>Trusted devices now</span>
+              <span>Registered TerraScopes</span>
               <strong>{deviceStats.total}</strong>
             </article>
           </div>
         </section>
 
-        <section className="panel">
-          <div className="section-head">
-            <div>
-              <p className="eyebrow">What it is for</p>
-              <h2>HardTrust makes device provenance inspectable.</h2>
+        {/* --- How it works: 3 inline steps --- */}
+        <section className="panel panel-hover">
+          <div className="steps-row">
+            <div className="step-item">
+              <span className="step-icon">
+                <img src="/assets/demo-capture/capture.jpg" alt="Microscopy capture" />
+              </span>
+              <h3>Capture</h3>
+              <p>TerraScope takes a biological image</p>
             </div>
-          </div>
-
-          <div className="story-grid">
-            {storyPoints.map((item) => (
-              <article className="story-card" key={item.title}>
-                <h3>{item.title}</h3>
-                <p>{item.description}</p>
-              </article>
-            ))}
+            <span className="step-arrow">&rarr;</span>
+            <div className="step-item">
+              <span className="step-icon">&#x1F512;</span>
+              <h3>Sign</h3>
+              <p>Device hashes and signs the capture</p>
+            </div>
+            <span className="step-arrow">&rarr;</span>
+            <div className="step-item">
+              <span className="step-icon">&#x2713;</span>
+              <h3>Verify</h3>
+              <p>Anyone checks provenance on-chain</p>
+            </div>
           </div>
         </section>
 
-        <section className="panel">
+        {/* --- Verify a capture (PRIMARY) --- */}
+        <section className="panel demo-verify-panel" id="verify-capture">
           <div className="section-head">
             <div>
-              <p className="eyebrow">How it works</p>
-              <h2>From device identity to trusted verification.</h2>
+              <p className="eyebrow">Verify</p>
+              <h2>Upload a capture and verify its provenance.</h2>
             </div>
-          </div>
-
-          <div className="workflow-grid">
-            {workflowSteps.map((item) => (
-              <article className="workflow-card" key={item.step}>
-                <span className="step-index">{item.step}</span>
-                <h3>{item.title}</h3>
-                <p>{item.description}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="status-grid">
-          <div className="status-pill">
-            <span>Contract</span>
-            <strong>{appConfig.contractAddress || "Contract"}</strong>
-          </div>
-          <div className="status-pill">
-            <span>Chain</span>
-            <strong>{networkName || `Expected chain ${appConfig.expectedChainId}`}</strong>
-          </div>
-        </section>
-
-        <section className="panel">
-          <div className="section-head">
-            <div>
-              <p className="eyebrow">Registered devices</p>
-              <h2>Every device currently registered in the contract.</h2>
-            </div>
-            <p className="timestamp">
-              {lastUpdated ? `Last sync: ${lastUpdated.toLocaleTimeString()}` : "Waiting for first sync"}
-            </p>
-          </div>
-
-          {listError ? <p className="message error">{listError}</p> : null}
-
-          {loadingDevices ? (
-            <div className="empty-state">Loading registry data from the chain...</div>
-          ) : devices.length ? (
-            <div className="device-grid">
-              {devices.map((device) => (
-                <article className="device-card" key={device.serialHash}>
-                  <div className="device-card-head">
-                    <span className="badge success">Verified</span>
-                    <span>{formatTimestamp(device.attestedAt)}</span>
-                  </div>
-                  <h3>{shortAddress(device.deviceAddr)}</h3>
-                  <dl>
-                    <div>
-                      <dt>Serial hash</dt>
-                      <dd>{device.serialHash}</dd>
-                    </div>
-                    <div>
-                      <dt>Device address</dt>
-                      <dd>{device.deviceAddr}</dd>
-                    </div>
-                    <div>
-                      <dt>Attester</dt>
-                      <dd>{device.attester}</dd>
-                    </div>
-                  </dl>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-state">
-              No devices are registered yet. Deploy the contract, connect the attester wallet, and
-              submit the first device below.
-            </div>
-          )}
-        </section>
-
-        <section className="panel register-panel" id="verify-my-device">
-          <div className="section-head">
-            <div>
-              <p className="eyebrow">Verify my device</p>
-              <h2>Register a device directly on-chain with the attester wallet.</h2>
-            </div>
-            <span className={`badge ${isAuthorizedAttester ? "success" : "warning"}`}>
-              {isAuthorizedAttester ? "Attester wallet confirmed" : "Attester wallet required"}
-            </span>
-          </div>
-
-          <div className="register-copy">
-            <p>
-              The contract only allows the configured attester address to call
-              `registerDevice(serialHash, deviceAddr)`. This section is where the trusted device
-              verification flow becomes an on-chain registration.
-            </p>
-            <p>
-              The serial string is hashed in the browser using `keccak256(utf8(serial))`, matching
-              the contract flow used by your CLI.
-            </p>
-          </div>
-
-          <div className="wallet-box">
-            <div>
-              <span>Wallet</span>
-              <strong>{walletAddress ? walletAddress : "No wallet connected"}</strong>
-            </div>
-            <div>
-              <span>Balance</span>
-              <strong>{walletBalance ? `${walletBalance} ETH` : "-"}</strong>
-            </div>
-            <div>
-              <span>Chain</span>
-              <strong>
-                {walletChainId === null ? "-" : walletChainId}
-                {walletChainMatches ? "" : " (wrong chain)"}
-              </strong>
-            </div>
-          </div>
-
-          <form className="register-form" onSubmit={handleSubmit}>
-            <label>
-              <span>Device serial</span>
-              <input
-                type="text"
-                placeholder="100000004d01af60"
-                value={form.serial}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, serial: event.target.value }))
-                }
-              />
-            </label>
-
-            <label>
-              <span>Device address</span>
-              <input
-                type="text"
-                placeholder="0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
-                value={form.deviceAddress}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, deviceAddress: event.target.value }))
-                }
-              />
-            </label>
-
-            <div className="form-actions">
-              <button
-                className="primary-button"
-                type="submit"
-                disabled={submitting || !isAuthorizedAttester || !walletChainMatches}
-              >
-                {submitting ? "Submitting..." : "Register device"}
-              </button>
-              <button
-                className="secondary-button"
-                type="button"
-                onClick={() => setForm(emptyForm)}
-                disabled={submitting}
-              >
-                Clear form
-              </button>
-            </div>
-          </form>
-
-          {submitError ? <p className="message error">{submitError}</p> : null}
-          {txHash ? (
-            <p className="message success">
-              Transaction confirmed: <code>{txHash}</code>
-            </p>
-          ) : null}
-        </section>
-
-        <section className="panel demo-verify-panel">
-          <div className="section-head">
-            <div>
-              <p className="eyebrow">Capture verify</p>
-              <h2>Choose your own files and run the MVP verification flow.</h2>
-            </div>
-            <span
-              className={`badge ${
-                demoVerification
-                  ? demoVerification.verified
-                    ? "success"
-                    : "warning"
-                  : "neutral"
-              }`}
-            >
-              {demoVerification
-                ? `verified: ${demoVerification.verified ? "true" : "false"}`
-                : "Not checked"}
-            </span>
           </div>
 
           <div className="demo-verify-grid">
@@ -890,17 +667,19 @@ function AppContent() {
                   alt="Selected capture preview"
                 />
               ) : (
-                <div className="demo-preview-empty">Choose an image to preview it here.</div>
+                <div className="demo-preview-empty">
+                  <img
+                    className="demo-preview-placeholder"
+                    src="/assets/demo-capture/capture.jpg"
+                    alt="Example TerraScope microscopy capture"
+                  />
+                </div>
               )}
             </div>
 
             <div className="demo-verify-copy">
               <p>
-                Select your capture image, `metadata.json`, and `sign.json`.
-              </p>
-              <p>
-                Clicking `verify` hashes the selected image and metadata file, compares them with
-                the manifest in `sign.json`, and returns a simple true or false result.
+                Select your capture image, <code>metadata.json</code>, and <code>sign.json</code>.
               </p>
 
               <div className="register-form">
@@ -935,7 +714,7 @@ function AppContent() {
                     verifyingDemoCapture || !captureImageFile || !metadataFile || !signFile
                   }
                 >
-                  {verifyingDemoCapture ? "Verifying..." : "verify"}
+                  {verifyingDemoCapture ? "Verifying..." : "Verify"}
                 </button>
               </div>
             </div>
@@ -943,119 +722,252 @@ function AppContent() {
 
           {demoVerificationError ? <p className="message error">{demoVerificationError}</p> : null}
 
+          {/* --- Big verdict card --- */}
           {demoVerification ? (
-            <div className="demo-result-grid">
-              <article className="status-pill">
-                <span>Verification result</span>
-                <strong>{demoVerification.verified ? "true" : "false"}</strong>
-              </article>
-              <article className="status-pill">
-                <span>Local files</span>
-                <strong>{demoVerification.filesVerified ? "match" : "mismatch"}</strong>
-              </article>
-              <article className="status-pill">
-                <span>Content hash</span>
-                <strong>{demoVerification.contentHashMatches ? "match" : "mismatch"}</strong>
-              </article>
-              <article className="status-pill">
-                <span>On-chain</span>
-                <strong>
-                  {demoVerification.onChain.available
-                    ? demoVerification.onChain.verified
-                      ? "verified"
-                      : "failed"
-                    : "unavailable"}
-                </strong>
-              </article>
-              <article className="status-pill">
-                <span>Recovered signer</span>
-                <strong>
-                  {demoVerification.onChain.signer
-                    ? shortAddress(demoVerification.onChain.signer)
-                    : "-"}
-                </strong>
-              </article>
-              <article className="status-pill">
-                <span>Checked at</span>
-                <strong>{demoVerification.checkedAt.toLocaleTimeString()}</strong>
-              </article>
-            </div>
-          ) : null}
+            <>
+              <div className={`verdict-card ${demoVerification.verified ? "verified" : "not-verified"}`}>
+                {demoVerification.verified
+                  ? `VERIFIED — from TerraScope #${extractSerialShort(verifiedManifest)}`
+                  : "NOT VERIFIED"}
+                <div className="verdict-sub">
+                  {demoVerification.checkedAt.toLocaleTimeString()}
+                </div>
+              </div>
 
-          {demoVerification ? (
-            <div className="demo-result-grid">
-              <article className="status-pill">
-                <span>Registered device</span>
-                <strong>{demoVerification.onChain.valid ? "yes" : "no"}</strong>
-              </article>
-              <article className="status-pill">
-                <span>Script hash</span>
-                <strong>
-                  {demoVerification.onChain.scriptConfigured
-                    ? demoVerification.onChain.scriptMatch
-                      ? "match"
-                      : "mismatch"
-                    : "not configured"}
-                </strong>
-              </article>
-              <article className="status-pill">
-                <span>Binary hash</span>
-                <strong>
-                  {demoVerification.onChain.binaryConfigured
-                    ? demoVerification.onChain.binaryMatch
-                      ? "match"
-                      : "mismatch"
-                    : "not configured"}
-                </strong>
-              </article>
-            </div>
-          ) : null}
+              {/* --- Summary row --- */}
+              <div className="summary-row">
+                <span className={`summary-item ${demoVerification.filesVerified ? "pass" : "fail"}`}>
+                  Files {demoVerification.filesVerified ? "\u2713" : "\u2717"}
+                </span>
+                <span className={`summary-item ${demoVerification.contentHashMatches ? "pass" : "fail"}`}>
+                  Content hash {demoVerification.contentHashMatches ? "\u2713" : "\u2717"}
+                </span>
+                <span className={`summary-item ${demoVerification.onChain.verified ? "pass" : "fail"}`}>
+                  On-chain {demoVerification.onChain.verified ? "\u2713" : "\u2717"}
+                </span>
+              </div>
 
-          {demoVerification?.onChain?.message ? (
-            <p
-              className={`message ${
-                demoVerification.onChain.verified ? "success" : "error"
-              }`}
-            >
-              {demoVerification.onChain.message}
-            </p>
-          ) : null}
-
-          {demoVerification ? (
-            <div className="demo-file-grid">
-              {demoVerification.fileResults.map((file) => (
-                <article className="device-card" key={file.name}>
-                  <div className="device-card-head">
-                    <span
-                      className={`badge ${
-                        file.hashMatches && file.sizeMatches ? "success" : "warning"
-                      }`}
-                    >
-                      {file.hashMatches && file.sizeMatches ? "verified" : "failed"}
-                    </span>
-                    <span>{file.size} bytes</span>
+              {/* --- Expandable technical details --- */}
+              <details className="verify-details">
+                <summary>Technical details</summary>
+                <div className="detail-grid">
+                  <div className="detail-row">
+                    <dt>Signer</dt>
+                    <dd>{demoVerification.onChain.signer || "-"}</dd>
                   </div>
-                  <h3>{file.name}</h3>
+                  <div className="detail-row">
+                    <dt>Capture hash</dt>
+                    <dd>{demoVerification.onChain.captureHash || "-"}</dd>
+                  </div>
+                  <div className="detail-row">
+                    <dt>Content hash</dt>
+                    <dd>{demoVerification.expectedContentHash}</dd>
+                  </div>
+                  <div className="detail-row">
+                    <dt>Registered</dt>
+                    <dd>{demoVerification.onChain.valid ? "Yes" : "No"}</dd>
+                  </div>
+                  <div className="detail-row">
+                    <dt>Script hash</dt>
+                    <dd>
+                      {demoVerification.onChain.scriptConfigured
+                        ? demoVerification.onChain.scriptMatch
+                          ? "MATCH"
+                          : "MISMATCH"
+                        : "not configured"}
+                    </dd>
+                  </div>
+                  <div className="detail-row">
+                    <dt>Binary hash</dt>
+                    <dd>
+                      {demoVerification.onChain.binaryConfigured
+                        ? demoVerification.onChain.binaryMatch
+                          ? "MATCH"
+                          : "MISMATCH"
+                        : "not configured"}
+                    </dd>
+                  </div>
+
+                  {demoVerification.fileResults.map((file) => (
+                    <div className="detail-row" key={file.name}>
+                      <dt>{file.name}</dt>
+                      <dd>
+                        {file.hashMatches && file.sizeMatches ? "MATCH" : "MISMATCH"} — {file.hash} ({file.size} bytes)
+                      </dd>
+                    </div>
+                  ))}
+                </div>
+              </details>
+
+              {demoVerification.onChain.message ? (
+                <p
+                  className={`message ${
+                    demoVerification.onChain.verified ? "success" : "error"
+                  }`}
+                >
+                  {demoVerification.onChain.message}
+                </p>
+              ) : null}
+            </>
+          ) : null}
+        </section>
+
+        {/* --- Registered TerraScopes --- */}
+        <section className="panel">
+          <div className="section-head">
+            <div>
+              <p className="eyebrow">Registry</p>
+              <h2>TerraScope microscopes registered on-chain.</h2>
+            </div>
+            <p className="timestamp">
+              {lastUpdated ? `Last sync: ${lastUpdated.toLocaleTimeString()}` : "Waiting for first sync"}
+            </p>
+          </div>
+
+          {listError ? <p className="message error">{listError}</p> : null}
+
+          {loadingDevices ? (
+            <div className="empty-state">Loading registry data from the chain...</div>
+          ) : devices.length ? (
+            <div className="device-grid">
+              {devices.map((device) => (
+                <article className="device-card" key={device.serialHash}>
+                  <div className="device-card-head">
+                    <span className="badge success">Registered</span>
+                    <span>{formatTimestamp(device.attestedAt)}</span>
+                  </div>
+                  <h3>{shortAddress(device.deviceAddr)}</h3>
                   <dl>
                     <div>
-                      <dt>Hash</dt>
-                      <dd>{file.hash}</dd>
+                      <dt>Serial hash</dt>
+                      <dd>{device.serialHash}</dd>
                     </div>
                     <div>
-                      <dt>Status</dt>
-                      <dd>
-                        {file.hashMatches && file.sizeMatches
-                          ? "Hash and size match manifest"
-                          : "Hash or size mismatch"}
-                      </dd>
+                      <dt>Microscope address</dt>
+                      <dd>{device.deviceAddr}</dd>
+                    </div>
+                    <div>
+                      <dt>Attester</dt>
+                      <dd>{device.attester}</dd>
                     </div>
                   </dl>
                 </article>
               ))}
             </div>
-          ) : null}
+          ) : (
+            <div className="empty-state">
+              No microscopes are registered yet. Deploy the contract, connect the attester wallet, and
+              register the first TerraScope below.
+            </div>
+          )}
         </section>
+
+        {/* --- Register (attester-only, collapsed) --- */}
+        {isAuthorizedAttester ? (
+          <section className="panel register-panel">
+            {!showRegister ? (
+              <div className="register-toggle">
+                <button className="secondary-button" onClick={() => setShowRegister(true)}>
+                  Register a TerraScope
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="section-head">
+                  <div>
+                    <p className="eyebrow">Register</p>
+                    <h2>Register a new TerraScope on-chain.</h2>
+                  </div>
+                  <span className="badge success">Attester wallet confirmed</span>
+                </div>
+
+                <div className="wallet-box">
+                  <div>
+                    <span>Wallet</span>
+                    <strong>{walletAddress ? walletAddress : "No wallet connected"}</strong>
+                  </div>
+                  <div>
+                    <span>Balance</span>
+                    <strong>{walletBalance ? `${walletBalance} ETH` : "-"}</strong>
+                  </div>
+                  <div>
+                    <span>Chain</span>
+                    <strong>
+                      {walletChainId === null ? "-" : walletChainId}
+                      {walletChainMatches ? "" : " (wrong chain)"}
+                    </strong>
+                  </div>
+                </div>
+
+                <form className="register-form" onSubmit={handleSubmit}>
+                  <label>
+                    <span>Microscope serial</span>
+                    <input
+                      type="text"
+                      placeholder="00000000ba807092"
+                      value={form.serial}
+                      onChange={(event) =>
+                        setForm((current) => ({ ...current, serial: event.target.value }))
+                      }
+                    />
+                  </label>
+
+                  <label>
+                    <span>Microscope address</span>
+                    <input
+                      type="text"
+                      placeholder="0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
+                      value={form.deviceAddress}
+                      onChange={(event) =>
+                        setForm((current) => ({ ...current, deviceAddress: event.target.value }))
+                      }
+                    />
+                  </label>
+
+                  <div className="form-actions">
+                    <button
+                      className="primary-button"
+                      type="submit"
+                      disabled={submitting || !isAuthorizedAttester || !walletChainMatches}
+                    >
+                      {submitting ? "Submitting..." : "Register TerraScope"}
+                    </button>
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      onClick={() => setForm(emptyForm)}
+                      disabled={submitting}
+                    >
+                      Clear form
+                    </button>
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={() => setShowRegister(false)}
+                    >
+                      Close
+                    </button>
+                  </div>
+                </form>
+
+                {submitError ? <p className="message error">{submitError}</p> : null}
+                {txHash ? (
+                  <p className="message success">
+                    Transaction confirmed: <code>{txHash}</code>
+                  </p>
+                ) : null}
+              </>
+            )}
+          </section>
+        ) : null}
       </main>
+
+      {/* --- Footer --- */}
+      <footer className="site-footer">
+        <img className="footer-logo" src="/assets/biotexturas-logo.png" alt="biotexturas" />
+        <span><strong>TerraGenesis</strong> &middot; A biotexturas project &middot; Built on HardTrust</span>
+        <span>&middot; Contract: {appConfig.contractAddress || "not configured"} &middot; Chain: {networkName || `${appConfig.expectedChainId}`}</span>
+      </footer>
     </div>
   );
 }
