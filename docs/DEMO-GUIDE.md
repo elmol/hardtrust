@@ -17,8 +17,7 @@ source .env.demo
 ## Step 1 — RPi: Initialize Device
 
 ```bash
-sshpass -p "$RPI_PASS" ssh $RPI_USER@$RPI_HOST "rm -f /home/pi/.hardtrust
-/device.key"
+sshpass -p "$RPI_PASS" ssh $RPI_USER@$RPI_HOST "rm -f /home/pi/.hardtrust/device.key"
 sshpass -p "$RPI_PASS" ssh $RPI_USER@$RPI_HOST "device init"
 ```
 
