@@ -582,9 +582,12 @@ function AppContent() {
   return (
     <div className="shell">
       <header className="topbar">
-        <div>
-          <p className="eyebrow">TerraGenesis</p>
-          <h1>Provenance for every observation.</h1>
+        <div className="topbar-brand">
+          <img className="topbar-logo" src="/assets/biotexturas-logo.png" alt="biotexturas logo" />
+          <div className="topbar-text">
+            <h1>TerraGenesis</h1>
+            <p className="tagline">Provenance for every observation</p>
+          </div>
         </div>
         <button className="ghost-button" onClick={connectWallet} disabled={connectingWallet}>
           {connectingWallet ? "Connecting..." : walletAddress ? shortAddress(walletAddress) : "Connect wallet"}
@@ -612,7 +615,8 @@ function AppContent() {
             </div>
           </div>
 
-          <div className="hero-meta">
+          <div className="hero-visual">
+            <img className="hero-image" src="/assets/DevicePhoto.jpeg" alt="TerraScope microscope" />
             <article className="stat-card">
               <span>Registered TerraScopes</span>
               <strong>{deviceStats.total}</strong>
@@ -621,22 +625,24 @@ function AppContent() {
         </section>
 
         {/* --- How it works: 3 inline steps --- */}
-        <section className="panel">
+        <section className="panel panel-hover">
           <div className="steps-row">
             <div className="step-item">
-              <span className="step-icon">1</span>
+              <span className="step-icon">
+                <img src="/assets/demo-capture/capture.jpg" alt="Microscopy capture" />
+              </span>
               <h3>Capture</h3>
               <p>TerraScope takes a biological image</p>
             </div>
             <span className="step-arrow">&rarr;</span>
             <div className="step-item">
-              <span className="step-icon">2</span>
+              <span className="step-icon">&#x1F512;</span>
               <h3>Sign</h3>
               <p>Device hashes and signs the capture</p>
             </div>
             <span className="step-arrow">&rarr;</span>
             <div className="step-item">
-              <span className="step-icon">3</span>
+              <span className="step-icon">&#x2713;</span>
               <h3>Verify</h3>
               <p>Anyone checks provenance on-chain</p>
             </div>
@@ -661,7 +667,13 @@ function AppContent() {
                   alt="Selected capture preview"
                 />
               ) : (
-                <div className="demo-preview-empty">Choose an image to preview it here.</div>
+                <div className="demo-preview-empty">
+                  <img
+                    className="demo-preview-placeholder"
+                    src="/assets/demo-capture/capture.jpg"
+                    alt="Example TerraScope microscopy capture"
+                  />
+                </div>
               )}
             </div>
 
@@ -952,9 +964,9 @@ function AppContent() {
 
       {/* --- Footer --- */}
       <footer className="site-footer">
-        <strong>TerraGenesis</strong> &middot; A biotexturas project &middot; Built on HardTrust
-        <br />
-        Contract: {appConfig.contractAddress || "not configured"} &middot; Chain: {networkName || `${appConfig.expectedChainId}`}
+        <img className="footer-logo" src="/assets/biotexturas-logo.png" alt="biotexturas" />
+        <span><strong>TerraGenesis</strong> &middot; A biotexturas project &middot; Built on HardTrust</span>
+        <span>&middot; Contract: {appConfig.contractAddress || "not configured"} &middot; Chain: {networkName || `${appConfig.expectedChainId}`}</span>
       </footer>
     </div>
   );
